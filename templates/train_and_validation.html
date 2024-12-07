@@ -97,35 +97,143 @@
             </div> 
         </div>
     </div> 
-
     <div class = "container mt-5">
-        <h1 class="custom-header-h1">Clustering for Variance</h1>
+        <h1 class="custom-header-h1">Clustering on Variance</h1>
         <div class="card shadow-lg">
             <div class="card-body">
-                <form action="/variance">
-                    <div class="row mt-4">
-                        <div class="col-md-12 text-center">
-                            <button type="submit" class="btn btn-primary btn-lg">Variance</button>
+                <div class="row"> 
+                    <!-- First Card: Kmeans -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card shadow-lg">
+                            <div class="card-body text-center">
+                                <form action="/variance">
+                                    <button type="submit" class="btn btn-primary btn-lg">Kmeans</button>
+                                </form>
+                                <p class="card-text mt-3">Perform K-means clustering on the variance data. This will generate a 3D plot showing the data points and cluster centers.</p>
+                            </div>
                         </div>
                     </div>
-                </form>
+                    <!-- Second Card: Custom Button -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card shadow-lg">
+                            <div class="card-body text-center">
+                                <form action="/variance_pca">
+                                    <button type="submit" class="btn btn-secondary btn-lg">KMEANS-PCA</button>
+                                </form>
+                                <p class="card-text mt-3">Perform K-means clustering on the variance data with PCA. This will generate a 3D plot showing the data points and cluster centers.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="container mt-4">
+                    <div class="row">
+                        {% if show_plts %}
+                        <!-- Accelerometer Plot -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="custom-header-h5">Accelerometer Cluster Plot</h5>
+                                    <img src="{{ url_for('static', filename='images/' + plt_acc) }}" alt="Accelerometer Cluster Plot" class="responsive-img">
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Gyroscope Plot -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="custom-header-h5">Gyroscope Cluster Plot</h5>
+                                    <img src="{{ url_for('static', filename='images/' + plt_gyro) }}" alt="Gyroscope Cluster Plot" class="responsive-img">
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if show_pca_plts %}
+                        <!-- Accelerometer Plot -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="custom-header-h5">Accelerometer PCA Cluster Plot</h5>
+                                    <img src="{{ url_for('static', filename='images/' + plt_acc_pca) }}" alt="Accelerometer PCA Cluster Plot" class="responsive-img">
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Gyroscope Plot -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="custom-header-h5">Gyroscope PCA Cluster Plot</h5>
+                                    <img src="{{ url_for('static', filename='images/' + plt_gyro_pca) }}" alt="Gyroscope PCA Cluster Plot" class="responsive-img">
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="container mt-4">
+                    <div class="row">
+                        <!-- Form Card -->
+                        <div class="col-md-12 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="custom-header-h5">Select Logs</h5>
+                                    <div class="row mb-4">
+                                        <p class="card-text mt-3">Select the activity and the logs on which to train the model.</p>
+                                        <form action="/process_activity" method="post">
+                                            <div class="form-group">
+                                                <label for="model" class="font-weight-bold fs-5">Activity</label>
+                                                <select class="form-control" id="activity_log" name="activity_log" required>
+                                                    <option value="" selected> Select an activity </option>
+                                                    {% for row in activities %}
+                                                    <option value= "{{ row['activity_name'] }}"> {{ row['activity_name'] }} </option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+    
+                                            <button type="submit" class="btn btn-secondary btn-margin-top">Submit Activity</button>
+                                        </form>
+                                    </div>
+                                    <div class="row mb-4">
+                                        <form action="/process_logs" method="post">
+                                            <div class="form-group">
+                                                <label for="model" class="font-weight-bold fs-5">Logs</label>
+                                                <select class="form-control" id="logs" name="logs" required>
+                                                    <option value="" selected> Select a log </option>
+                                                    {% for row in logs %}
+                                                    <option value= "{{ row['ID'] }}"> {{ row }} </option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            
+                                            <button type="submit" class="btn btn-secondary btn-margin-top">Submit Logs</button>
+                                        </form>
+                                    </div>
+                                    
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="container mt-4">
                     <div class="row">
                         <!-- Accelerometer Card -->
                         {% if acc_dict %}
-                        <div class="col-md-6 mb-4">
+                        <div class="col-md-12 mb-4">
                             <div class="card">
                                 <div class="card-body">
                                     <h5 class="custom-header-h5">Accelerometer</h5>
                                     <!-- Iterate over the accel_dict dictionary -->
                                     {% for id_log, variances in acc_dict.items() %}
                                     <div class="mb-3">
-                                        <h2 class="custom-header-id-log">{{ id_log }}</h2>
+                                        <h2 class="custom-header-id-log">Log_id: {{ id_log }}</h2>
                                         <p class="card-text">Variance values:</p>
                                         <ul class="list-group list-group-flush">
-                                            <li class="list-group-item">Variance X: {{ variances.varianceX }}</li>
-                                            <li class="list-group-item">Variance Y: {{ variances.varianceY }}</li>
-                                            <li class="list-group-item">Variance Z: {{ variances.varianceZ }}</li>
+                                            <li class="list-group-item"><span class="bold-large-text">Variance X:</span>{{ variances.varianceX }}</li>
+                                            <li class="list-group-item"><span class="bold-large-text">Variance Y:</span> {{ variances.varianceY }}</li>
+                                            <li class="list-group-item"><span class="bold-large-text">Variance Z:</span> {{ variances.varianceZ }}</li>
+                                            <li class="list-group-item"><span class="bold-large-text">Activity:</span> {{ variances.activity }}</li>
                                         </ul>
                                     </div>
                                     {% if not loop.last %}
@@ -136,22 +244,74 @@
                             </div>
                         </div>
                         {% endif %}
-                
+                        {% if acc_pca %}
+                        <div class="col-md-12 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="custom-header-h5">Accelerometer PCA</h5>
+                                    <!-- Iterate over the acc_pca dictionary -->
+                                    {% for id_log, variances in acc_pca.items() %}
+                                    <div class="mb-3">
+                                        <h2 class="custom-header-id-log">Log_id: {{ id_log }}</h2>
+                                        <p class="card-text">Variance values:</p>
+                                        <ul class="list-group list-group-flush">
+                                            <li class="list-group-item"><span class="bold-large-text">Variance X:</span> {{ variances.varianceX }}</li>
+                                            <li class="list-group-item"><span class="bold-large-text">Variance Y:</span> {{ variances.varianceY }}</li>
+                                            <li class="list-group-item"><span class="bold-large-text">Variance Z:</span> {{ variances.varianceZ }}</li>
+                                            <li class="list-group-item"><span class="bold-large-text">Activity:</span> {{ variances.activity }}</li>
+                                        </ul>
+                                    </div>
+                                    {% if not loop.last %}
+                                    <hr class="thick-separator">
+                                    {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="row">
                         <!-- Gyroscope Card -->
                         {% if gyro_dict %}
-                        <div class="col-md-6 mb-4">
+                        <div class="col-md-12 mb-4">
                             <div class="card">
                                 <div class="card-body">
                                     <h5 class="custom-header-h5">Gyroscope</h5>
                                     <!-- Iterate over the gyro_dict dictionary -->
                                     {% for id_log, variances in gyro_dict.items() %}
                                     <div class="mb-3">
-                                        <h5 class="custom-header-id-log">{{ id_log }}</h5>
+                                        <h5 class="custom-header-id-log">Lod_id: {{ id_log }}</h5>
                                         <p class="card-text">Variance values:</p>
                                         <ul class="list-group list-group-flush">
-                                            <li class="list-group-item">Variance X: {{ variances.varianceX }}</li>
-                                            <li class="list-group-item">Variance Y: {{ variances.varianceY }}</li>
-                                            <li class="list-group-item">Variance Z: {{ variances.varianceZ }}</li>
+                                            <li class="list-group-item"><span class="bold-large-text">Variance X:</span> {{ variances.varianceX }}</li>
+                                            <li class="list-group-item"><span class="bold-large-text">Variance Y:</span> {{ variances.varianceY }}</li>
+                                            <li class="list-group-item"><span class="bold-large-text">Variance Z:</span> {{ variances.varianceZ }}</li>
+                                            <li class="list-group-item"><span class="bold-large-text">Activity:</span> {{ variances.activity }}</li>
+                                        </ul>
+                                    </div>
+                                    {% if not loop.last %}
+                                    <hr class="thick-separator">
+                                    {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if gyro_pca %}
+                        <div class="col-md-12 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="custom-header-h5">Gyroscope PCA</h5>
+                                    <!-- Iterate over the gyro_pca dictionary -->
+                                    {% for id_log, variances in gyro_pca.items() %}
+                                    <div class="mb-3">
+                                        <h5 class="custom-header-id-log">Log_id: {{ id_log }}</h5>
+                                        <p class="card-text">Variance values:</p>
+                                        <ul class="list-group list-group-flush">
+                                            <li class="list-group-item"><span class="bold-large-text">Variance X:</span> {{ variances.varianceX }}</li>
+                                            <li class="list-group-item"><span class="bold-large-text">Variance Y:</span> {{ variances.varianceY }}</li>
+                                            <li class="list-group-item"><span class="bold-large-text">Variance Z:</span> {{ variances.varianceZ }}</li>
+                                            <li class="list-group-item"><span class="bold-large-text">Activity:</span> {{ variances.activity }}</li>
                                         </ul>
                                     </div>
                                     {% if not loop.last %}

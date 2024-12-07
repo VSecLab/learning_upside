@@ -13,10 +13,10 @@ def model_train(userid, sid, device, features, epochs, batch_size, model):
     :param int userid: the ID of the user for whom the model is being trained.
     :param str sid: the session ID associated with the user.
     :param str device: the device from which the data is collected.
-    :param features list: a list of features to be used for training the model.
-    :param epochs int: the number of epochs for training the model.
-    :param batch_size int: the batch size for training the model.
-    :param model str: the type of model to be trained.
+    :param list features: a list of features to be used for training the model.
+    :param int epochs: the number of epochs for training the model.
+    :param int batch_size: the batch size for training the model.
+    :param str model: the type of model to be trained.
 
     :return: a tuple containing the trained model and the scaler used for feature scaling.
     :rtype: tuple

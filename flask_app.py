@@ -1,10 +1,11 @@
-from flask import Flask, render_template, session, request
-from global_ml import check
-from flask_session import Session
-import ml_workflow as mlw
-import mysql.connector
+import io
 import pandas as pd
+import mysql.connector
+from global_ml import check
+import ml_workflow as mlw
 import upside_clustering as uc
+from flask_session import Session
+from flask import Flask, render_template, session, request
 
 app = Flask(__name__)
 
@@ -30,6 +31,27 @@ def get_db_connection():
 def index():
     return render_template('index.html')
 
+@app.route('/process_activity', methods=['POST'])
+def process_activity():
+    selected_activity = request.form['activity_log']
+    
+    acc_dict = session.get('acc_dict', {})
+    gyro_dict = session.get('gyro_dict', {})
+
+    logs = [k for k, v in acc_dict.items() if v['activity'] == selected_activity]
+    logs.extend([k for k, v in gyro_dict.items() if v['activity'] == selected_activity])
+
+    session['logs'] = logs 
+    print(session['logs'])
+
+    # TODO: use this logs for machine learning
+    # you can choose to show only these logs that were selected based on the activity 
+    # instead of all the logs coming from the kmeans 
+
+    if session['show_pca_plts'] == True: 
+        return render_template('train_and_validation.html', logs = logs, results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movment = session['user_movement'], acc_pca = session['acc_dict'], gyro_pca = session['gyro_dict'], plt_acc_pca = session['acc_plt'], plt_gyro_pca = session['gyro_plt'], show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
+    elif session['show_normal_plts'] == True: 
+        return render_template('train_and_validation.html', logs = logs, results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movment = session['user_movement'], acc_dict = session['acc_dict'], gyro_dict = session['gyro_dict'], plt_acc = session['acc_plt'], plt_gyro = session['gyro_plt'], show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
 @app.route('/variance')
 def variance_page():
     print("Variance page")
@@ -46,39 +68,106 @@ def variance_page():
     df_gyroscope = pd.DataFrame(results)
     session['df_gyroscope'] = df_gyroscope
 
-    cursor.close()
-    connection.close()
-
-    acc_df_0, acc_df_1 = uc.ml_kmeans(df_accelerometer, "Accelerometer")
-    gyro_df_0, gyro_df_1 = uc.ml_kmeans(df_gyroscope, "Gyroscope")
+    acc_df_0, acc_df_1, plt_acc = uc.ml_kmeans(df_accelerometer, "Accelerometer")
+    gyro_df_0, gyro_df_1, plt_gyro = uc.ml_kmeans(df_gyroscope, "Gyroscope")
 
     # Save ID_movement and corresponding variances in a dictionary
     acc_dict = {}
     for _, row in acc_df_1.iterrows():
+        sql = "select activity_name from activity where ID_activity = (select ID_activity from movement where ID_movement = %s)"
+        cursor.execute(sql, (row['ID_movement'],))
+        acc_act = cursor.fetchone()
         acc_dict[row['ID_movement']] = {
             'varianceX': row['varianceX'],
             'varianceY': row['varianceY'],
-            'varianceZ': row['varianceZ']
+            'varianceZ': row['varianceZ'], 
+            'activity': acc_act['activity_name']
         }
 
     # Save ID_movement and corresponding variances in a dictionary
     gyro_dict = {}
     for _, row in gyro_df_1.iterrows():
+        sql = "select activity_name from activity where ID_activity = (select ID_activity from movement where ID_movement = %s)"
+        cursor.execute(sql, (row['ID_movement'],))
+        gyro_act = cursor.fetchone()
         gyro_dict[row['ID_movement']] = {
             'varianceX': row['varianceX'],
             'varianceY': row['varianceY'],
-            'varianceZ': row['varianceZ']
+            'varianceZ': row['varianceZ'], 
+            'activity': gyro_act['activity_name']
         }
+
+    cursor.close()
+    connection.close()
 
     session['acc_dict'] = acc_dict
     session['gyro_dict'] = gyro_dict
+    session['show_pca_plts'] = False
+    session['show_normal_plts'] = True
+    session['acc_plt'] = plt_acc
+    session['gyro_plt'] = plt_gyro
 
-    print(session['gyro_dict'])
+    return render_template('train_and_validation.html', results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movement = session['user_movement'], acc_dict = acc_dict, gyro_dict = gyro_dict, plt_acc = plt_acc, plt_gyro = plt_gyro, show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
 
-    #print("Accelerometer effective movement log: ", acc_df_1)
-    #print("Gyroscope effective movement log:", gyro_df_1)
+@app.route('/variance_pca')
+def variance_pca_page(): 
+    print("Variance PCA page")
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
 
-    return render_template('train_and_validation.html', acc_dict = acc_dict, gyro_dict = gyro_dict)
+    cursor.execute("SELECT ID_movement, varianceX, varianceY, varianceZ, sensor FROM movement where sensor = \"accelerometer\" and varianceX IS NOT NULL AND varianceY IS NOT NULL AND varianceZ IS NOT NULL")
+    results = cursor.fetchall()
+    df_accelerometer = pd.DataFrame(results)
+    session['df_accelerometer'] = df_accelerometer
+
+    cursor.execute("SELECT ID_movement, varianceX, varianceY, varianceZ, sensor FROM movement where sensor = \"gyroscope\" and varianceX IS NOT NULL AND varianceY IS NOT NULL AND varianceZ IS NOT NULL")
+    results = cursor.fetchall()
+    df_gyroscope = pd.DataFrame(results)
+    session['df_gyroscope'] = df_gyroscope
+
+    acc_df_0, acc_df_1, plt_acc_pca = uc.PCA_kmeans(df_accelerometer, "Accelerometer")
+    gyro_df_0, gyro_df_1, plt_gyro_pca = uc.PCA_kmeans(df_gyroscope, "Gyroscope")
+
+    # Save ID_movement and corresponding variances in a dictionary
+    acc_dict = {}
+    for _, row in acc_df_1.iterrows():
+        sql = "select activity_name from activity where ID_activity = (select ID_activity from movement where ID_movement = %s)"
+        cursor.execute(sql, (row['ID_movement'],))
+        acc_act = cursor.fetchone()
+        
+        acc_dict[row['ID_movement']] = {
+            'varianceX': row['varianceX'],
+            'varianceY': row['varianceY'],
+            'varianceZ': row['varianceZ'], 
+            'activity': acc_act['activity_name']
+        }
+
+    # Save ID_movement and corresponding variances in a dictionary
+    gyro_dict = {}
+    for _, row in gyro_df_1.iterrows():
+        sql = "select activity_name from activity where ID_activity = (select ID_activity from movement where ID_movement = %s)"
+        cursor.execute(sql, (row['ID_movement'],))
+        gyro_act = cursor.fetchone()
+
+        gyro_dict[row['ID_movement']] = {
+            'varianceX': row['varianceX'],
+            'varianceY': row['varianceY'],
+            'varianceZ': row['varianceZ'], 
+            'activity': gyro_act['activity_name']
+        }
+
+    cursor.close()
+    connection.close()
+
+    session['acc_dict'] = acc_dict
+    session['gyro_dict'] = gyro_dict
+    session['show_pca_plts'] = True
+    session['show_normal_plts'] = False
+    session['acc_plt'] = plt_acc_pca
+    session['gyro_plt'] = plt_gyro_pca
+ 
+    return render_template('train_and_validation.html', results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movment = session['user_movement'], acc_pca = acc_dict, gyro_pca = gyro_dict, plt_acc_pca = plt_acc_pca, plt_gyro_pca = plt_gyro_pca, show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
+
 
 @app.route('/train_and_validation')
 def train_and_validation_page():
@@ -112,11 +201,14 @@ def train_and_validation_page():
         if user_id not in user_movement:
             user_movement[user_id] = []
         user_movement[user_id].append(movement_id)
-    session['user_movement'] = user_movement_list
+    session['user_movement'] = user_movement
      
     cursor.close()
     connection.close()
-    return render_template('train_and_validation.html', results= results, activities = activities , devices = devices, events = events, user_movement = user_movement)
+
+    session['show_pca_plts'] = False
+    session['show_normal_plts'] = False
+    return render_template('train_and_validation.html', results= session['result_users'], activities = session['activities'], devices = session['devices'], events = session['events'], user_movement = session['user_movement'], show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
 
 
 @app.route('/run_train', methods=['POST'])
