@@ -1,0 +1,16 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homepage</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body>
+    <h1>Homepage</h1>
+    <button onclick="window.location.href='/train_and_validation'">Train and Validation</button>
+    <button onclick="window.location.href='/check'">Check</button>
+    <button onclick="window.location.href='/run_experiments'">Run Experiments</button>
+    <!-- Aggiungi altri bottoni per altre pagine, se necessario -->
+</body>
+</html>

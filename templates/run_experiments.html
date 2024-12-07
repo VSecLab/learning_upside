@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Run Experiments</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Run Experiments</h1>
+    <form action="/run_experiments" method="post">
+        <label for="parameter">Parameter:</label>
+        <input type="text" id="parameter" name="parameter"><br><br>
+        
+        <label for="threshold">Threshold:</label>
+        <input type="text" id="threshold" name="threshold"><br><br>
+        
+        <label for="epochs">Epochs:</label>
+        <input type="text" id="epochs" name="epochs"><br><br>
+        
+        <label for="batch_size">Batch Size:</label>
+        <input type="text" id="batch_size" name="batch_size"><br><br>
+        
+        <select id="model" name="model" required>
+            <option value="RNN">RNN</option>
+            <option value="RNN3label">RNN3label</option>
+            <option value="LSTMauto">LSTMauto</option>
+            <option value="LSTMlabel">LSTMlabel</option>
+        </select>
+        
+        <input type="submit" value="Submit">
+    </form>
+</body>
+</html>

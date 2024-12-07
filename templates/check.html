@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Check</h1>
+    <form action="/check" method="post">
+        <label for="userid">User ID:</label>
+        <input type="text" id="userid" name="userid"><br><br>
+        
+        <label for="sid">Sequence ID:</label>
+        <input type="text" id="sid" name="sid"><br><br>
+        
+        <label for="parameter">Parameter:</label>
+        <input type="text" id="parameter" name="parameter"><br><br>
+        
+        <label for="threshold">Threshold:</label>
+        <input type="text" id="threshold" name="threshold"><br><br>
+        
+        <label for="epochs">Epochs:</label>
+        <input type="text" id="epochs" name="epochs"><br><br>
+        
+        <label for="batch_size">Batch Size:</label>
+        <input type="text" id="batch_size" name="batch_size"><br><br>
+        
+        <select id="model" name="model" required>
+            <option value="RNN">RNN</option>
+            <option value="RNN3label">RNN3label</option>
+            <option value="LSTMauto">LSTMauto</option>
+            <option value="LSTMlabel">LSTMlabel</option>
+        </select>
+        
+        <input type="submit" value="Submit">
+    </form>
+
+     <!-- Testo aggiunto -->
+     <div class="additional-info">
+        <h2>Utenti disponibili</h2>
+        <p>
+            ConteTeresa User ID: 0<br>
+            AlessandroMercurio User ID: 1<br>
+            MassimilianoRak User ID: 2<br>
+            AntonioFerretti User ID: 3<br>
+            FrancescoEsposito User ID: 4<br>
+
+        </p>
+        <h2>Sequenze disponibili</h2>
+        <p>20</p>
+    </div>
+</div>
+</body>
+</html>
+</body>
+</html>

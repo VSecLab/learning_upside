@@ -1,0 +1,13 @@
+{
+    "image": "tensorflow/tensorflow",
+    "forwardPorts": [3000,41692],
+    "customizations": {
+      // Configure properties specific to VS Code.
+      "vscode": {
+        // Add the IDs of extensions you want installed when the container is created.
+        "extensions": ["streetsidesoftware.code-spell-checker"]
+      }
+    },
+    "postCreateCommand": "pip install pandas  scikit-learn  matplotlib "
+
+  }
