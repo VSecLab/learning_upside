@@ -31,27 +31,100 @@ def get_db_connection():
 def index():
     return render_template('index.html')
 
+@app.route('/validate_logs', methods=['POST'])
+def validate_logs_page():
+    parameters = request.form
+    sensor = parameters.get('sensor')
+    
+    acc_dict = session.get('acc_dict', {})
+    gyro_dict = session.get('gyro_dict', {})
+    test = session.get('test_log', {})   
+    test = {sensor: [k for k in test]}
+
+
+    # I need to retrieve the logs not used for training
+    # if the user trained with the accelerometer, then I also need to retrieve the gyroscope logs for testing
+    train_sensor = session.get('sensor', [])
+    logs = session.get('logs', {})
+    if train_sensor == "Accelerometer":
+        test_log = {"Gyroscope": logs.get(sensor, [])}
+    elif train_sensor == "Gyroscope":
+        test_log = {"Accelerometer": logs.get(sensor, [])}
+    elif train_sensor == "Both":
+        test_log = logs
+
+    combined_logs = {**test, **test_log}
+
+    # I need to retrieve the logs not used for training
+    general_logs = {}
+    if sensor != "Both": 
+        general_logs = {sensor: [k for k, v in acc_dict.items()]}
+    elif sensor == "Both":
+        general_logs = {
+            'Accelerometer': [k for k, v in acc_dict.items()],
+            'Gyroscope': [k for k, v in gyro_dict.items()]
+        }
+    
+    # TODO: use the function evalutate_model_on_activity() for the evaluation of the model
+    
+
+
+
+    return render_template('train_and_validation.html', acc_dict = acc_dict, gyro_dict = gyro_dict)
+
+     
+
+@app.route('/process_logs', methods=['POST'])
+def process_logs(): 
+    parameters = request.form
+    epochs = int(parameters.get('epochs'))
+    batch_size = int(parameters.get('batch_size'))
+    sensor = parameters.get('sensor')
+    model = parameters.get('model')
+
+    logs = session.get('logs', {})
+    
+    if sensor != 'Both':
+        sub_logs = {sensor: logs.get(sensor, [])}
+    else: 
+        sub_logs = logs
+
+    chosen_model, scaler, test_log = mlw.model_train_activity(sub_logs, epochs, batch_size, model)
+    
+    session['chosen_model'] = chosen_model
+    session['scaler'] = scaler
+    session['test_log'] = test_log
+    session['sensor'] = sensor
+
+
+    return render_template('train_and_validation.html', logs = logs, chosen_model = chosen_model, scaler = scaler, test_log = test_log, selected_activity = session['selected_activity'])
+
+
+
+
 @app.route('/process_activity', methods=['POST'])
 def process_activity():
     selected_activity = request.form['activity_log']
+    session['selected_activity'] = selected_activity
     
     acc_dict = session.get('acc_dict', {})
     gyro_dict = session.get('gyro_dict', {})
 
-    logs = [k for k, v in acc_dict.items() if v['activity'] == selected_activity]
-    logs.extend([k for k, v in gyro_dict.items() if v['activity'] == selected_activity])
+    logs = {
+    'Accelerometer': [k for k, v in acc_dict.items() if v['activity'] == selected_activity],
+    'Gyroscope': [k for k, v in gyro_dict.items() if v['activity'] == selected_activity]
+    }
 
-    session['logs'] = logs 
-    print(session['logs'])
+    session['logs'] = logs
 
     # TODO: use this logs for machine learning
     # you can choose to show only these logs that were selected based on the activity 
     # instead of all the logs coming from the kmeans 
 
     if session['show_pca_plts'] == True: 
-        return render_template('train_and_validation.html', logs = logs, results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movment = session['user_movement'], acc_pca = session['acc_dict'], gyro_pca = session['gyro_dict'], plt_acc_pca = session['acc_plt'], plt_gyro_pca = session['gyro_plt'], show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
+        return render_template('train_and_validation.html', selected_activity = selected_activity, logs = logs, results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movment = session['user_movement'], acc_pca = session['acc_dict'], gyro_pca = session['gyro_dict'], plt_acc_pca = session['acc_plt'], plt_gyro_pca = session['gyro_plt'], show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
     elif session['show_normal_plts'] == True: 
-        return render_template('train_and_validation.html', logs = logs, results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movment = session['user_movement'], acc_dict = session['acc_dict'], gyro_dict = session['gyro_dict'], plt_acc = session['acc_plt'], plt_gyro = session['gyro_plt'], show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
+        return render_template('train_and_validation.html', selected_activity = selected_activity, logs = logs, results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movment = session['user_movement'], acc_dict = session['acc_dict'], gyro_dict = session['gyro_dict'], plt_acc = session['acc_plt'], plt_gyro = session['gyro_plt'], show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
 @app.route('/variance')
 def variance_page():
     print("Variance page")
@@ -77,11 +150,12 @@ def variance_page():
         sql = "select activity_name from activity where ID_activity = (select ID_activity from movement where ID_movement = %s)"
         cursor.execute(sql, (row['ID_movement'],))
         acc_act = cursor.fetchone()
+        
         acc_dict[row['ID_movement']] = {
             'varianceX': row['varianceX'],
             'varianceY': row['varianceY'],
             'varianceZ': row['varianceZ'], 
-            'activity': acc_act['activity_name']
+            'activity': acc_act['activity_name'] if acc_act['activity_name'] else "None"
         }
 
     # Save ID_movement and corresponding variances in a dictionary
@@ -94,8 +168,9 @@ def variance_page():
             'varianceX': row['varianceX'],
             'varianceY': row['varianceY'],
             'varianceZ': row['varianceZ'], 
-            'activity': gyro_act['activity_name']
+            'activity': gyro_act['activity_name'] if gyro_act['activity_name'] else "None"
         }
+
 
     cursor.close()
     connection.close()
@@ -139,7 +214,7 @@ def variance_pca_page():
             'varianceX': row['varianceX'],
             'varianceY': row['varianceY'],
             'varianceZ': row['varianceZ'], 
-            'activity': acc_act['activity_name']
+            'activity': acc_act['activity_name'] if acc_act['activity_name'] else "None"
         }
 
     # Save ID_movement and corresponding variances in a dictionary
@@ -153,7 +228,7 @@ def variance_pca_page():
             'varianceX': row['varianceX'],
             'varianceY': row['varianceY'],
             'varianceZ': row['varianceZ'], 
-            'activity': gyro_act['activity_name']
+            'activity': gyro_act['activity_name'] if gyro_act['activity_name'] else "None"
         }
 
     cursor.close()

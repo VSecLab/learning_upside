@@ -9,6 +9,7 @@
 </head>
 
 <body>
+    <!--
     <div class = "container mt-5">
         <h1 class="custom-header-h1">Train and Validation</h1>
         <div class="card shadow-lg">
@@ -42,7 +43,6 @@
                                 <option> {{ row['ID'] }} </option>
                                 {% endfor %}
                             </select>
-                            <!-- <input type="text" class="form-control" id="userID" placeholder="UserID" required> -->
                         </div>
                         <div class="col-md-6">
                             <label for="sid" class="font-weight-bold fs-5">Training Sequence ID</label>
@@ -96,7 +96,8 @@
                 </form>
             </div> 
         </div>
-    </div> 
+    </div>
+    -->
     <div class = "container mt-5">
         <h1 class="custom-header-h1">Clustering on Variance</h1>
         <div class="card shadow-lg">
@@ -179,37 +180,130 @@
                                 <div class="card-body">
                                     <h5 class="custom-header-h5">Select Logs</h5>
                                     <div class="row mb-4">
-                                        <p class="card-text mt-3">Select the activity and the logs on which to train the model.</p>
+                                        <p class="card-text mt-3">Select the activity to view the logs related to it.</p>
                                         <form action="/process_activity" method="post">
-                                            <div class="form-group">
-                                                <label for="model" class="font-weight-bold fs-5">Activity</label>
-                                                <select class="form-control" id="activity_log" name="activity_log" required>
-                                                    <option value="" selected> Select an activity </option>
-                                                    {% for row in activities %}
-                                                    <option value= "{{ row['activity_name'] }}"> {{ row['activity_name'] }} </option>
-                                                    {% endfor %}
-                                                </select>
+                                            <div class="row align-items-end">
+                                                <div class="col-md-8">
+                                                    <div class="form-group">
+                                                        <label for="activity_log" class="font-weight-bold fs-5">Activity</label>
+                                                        <select class="form-control" id="activity_log" name="activity_log" required>
+                                                            <option value="" selected> Select an activity </option>
+                                                            {% for row in activities %}
+                                                            <option value="{{ row['activity_name'] }}"> {{ row['activity_name'] }} </option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <button type="submit" class="btn btn-secondary btn-margin-top">Submit Activity</button>
+                                                </div>
                                             </div>
-    
-                                            <button type="submit" class="btn btn-secondary btn-margin-top">Submit Activity</button>
                                         </form>
                                     </div>
-                                    <div class="row mb-4">
-                                        <form action="/process_logs" method="post">
-                                            <div class="form-group">
-                                                <label for="model" class="font-weight-bold fs-5">Logs</label>
-                                                <select class="form-control" id="logs" name="logs" required>
-                                                    <option value="" selected> Select a log </option>
-                                                    {% for row in logs %}
-                                                    <option value= "{{ row['ID'] }}"> {{ row }} </option>
-                                                    {% endfor %}
-                                                </select>
+
+                                    {% if selected_activity %}
+                                    <div class="container mt-4">
+                                        <div class="row">
+                                            <div class="col-md-12 mb-4">
+                                                <div class="card shadow-lg">
+                                                    <div class="card-body">
+                                                        <h1 class="custom-header-h1 mt-4 text-center">Train</h1>
+                                                        <div class="row mb-4 mt-4">
+                                                            <form action="/process_logs" method="post">
+                                                                {% if selected_activity %}
+                                                                <div class="row mb-6">
+                                                                    <div class="col-md-6">
+                                                                        <label for="epochs" class="font-weight-bold fs-5">Epochs</label>
+                                                                        <input type="text" class="form-control" id="epochs" name="epochs" value="1" required>
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <label for="batch_size" class="font-weight-bold fs-5">Batch Size</label>
+                                                                        <input type="text" class="form-control" id="batch_size" name="batch_size" value="1" required>
+                                                                    </div>
+                                                                </div> 
+                                                                <div class="row mb-6 mt-2">
+                                                                    <div class="col-md-6">
+                                                                        <label for="sensor" class="font-weight-bold fs-5">Sensor</label>
+                                                                        <select class="form-control" id="sensor" name="sensor" required>
+                                                                            <option value="Accelerometer">Accelerometer</option>
+                                                                            <option value="Gyroscope">Gyroscope</option>
+                                                                            <option value="Both">Both</option>
+                                                                        </select>
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <label for="model" class="font-weight-bold fs-5">Model</label>
+                                                                        <select class="form-control" id="model" name="model" required>
+                                                                            <option value="RNN">RNN</option>
+                                                                            <option value="RNN3label">RNN3label</option>
+                                                                            <option value="LSTMauto">LSTMauto</option>
+                                                                            <option value="LSTMlabel">LSTMlabel</option>
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="row mb-4 mt-4">
+                                                                    <div class="col-md-12 text-center">
+                                                                        <button type="submit" onclick="submitForm('/process_logs');" class="btn btn-primary btn-lg">Train</button>
+                                                                    </div>
+                                                                </div>
+                                                                {% endif %}
+                                                            </form>
+                                                            <div class="col-md-12 mb-4">
+                                                                <div class="card">
+                                                                    <div class="card-body">
+                                                                        <h5 class="custom-header-h5">Validate</h5>
+                                                                        <div class="row mb-4">
+                                                                            <form action="/validate_logs", method="POST"> 
+                                                                                <p class="card-text mt-3">Select the sensor or sensors for which to retrieve the logs to perform validation.</p>
+                                                                                <div class="row align-items-end">
+                                                                                    <div class="col-md-8">
+                                                                                        <label for="sensor" class="font-weight-bold fs-5">Sensor</label>
+                                                                                        <select class="form-control" id="sensor" name="sensor" required>
+                                                                                            <option value="Accelerometer">Accelerometer</option>
+                                                                                            <option value="Gyroscope">Gyroscope</option>
+                                                                                            <option value="Both">Both</option>
+                                                                                        </select>
+                                                                                    </div>
+                                                                                    <div div class="col-md-4"">
+                                                                                    {%if chosen_model %}
+                                                                                        <button type="submit" onclick="submitForm('/validate_logs');" class="btn btn-secondary btn-margin-top">Validate</button>
+                                                                                    {% endif %}
+                                                                                </div>
+                                                                            </form>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="row mb-4">
+                                                            <h5 class="custom-header-h5">Logs for activity "{{ selected_activity }}"</h5>
+                                                            <p class="card-text mt-3">Logs related to the activity "{{ selected_activity }}". Click the button to train the model.</p>
+                                                            <div class="table-responsive">
+                                                                <table class="table table-striped">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th scope="col">Log ID</th>
+                                                                            <th style="border-left: 1px solid #dee2e6;" scope="col">Sensor</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {% for sensor, id_logs in logs.items() %}
+                                                                            {% for id_log in id_logs %}
+                                                                            <tr>
+                                                                                <td>{{ id_log }}</td>
+                                                                                <td style="border-left: 1px solid #dee2e6;">{{ sensor }}</td>
+                                                                            </tr>
+                                                                            {% endfor %}
+                                                                        {% endfor %}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            
-                                            <button type="submit" class="btn btn-secondary btn-margin-top">Submit Logs</button>
-                                        </form>
+                                        </div>
                                     </div>
-                                    
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>

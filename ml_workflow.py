@@ -1,3 +1,4 @@
+import random
 import time as tm
 import numpy as np  
 import pandas as pd 
@@ -5,6 +6,37 @@ import db_util as db
 import VisorData as vd
 
 from models import create_model
+
+#TODO this function 
+
+def evalutate_model_on_activity(right_test_logs, wrong_test_logs, chosen_model, scaler):
+    pass
+
+
+def model_train_activity(logs, epochs, batch_size, model):
+    logs_dict = db.get_df_from_logID(logs)
+
+    #print(logs_dict)
+
+    num_dataframes = len(logs_dict)
+
+    x = (num_dataframes * 80) // 100
+    
+    # randomize the order of the dictionary
+    keys = list(logs_dict.keys())
+    random.shuffle(keys)
+    randomized_logs_dict = {key: logs_dict[key] for key in keys}
+    #print(randomized_logs_dict)
+    
+    train_logs = {k: randomized_logs_dict[k] for k in list(randomized_logs_dict)[:x]}
+    test_logs = {k: randomized_logs_dict[k] for k in list(randomized_logs_dict)[x:]}
+    test_log_keys = list(test_logs.keys())
+
+    df = pd.concat(train_logs.values(), ignore_index=True)
+
+    chosen_model, scaler = create_model(df, epochs, batch_size, model)
+
+    return chosen_model, scaler, test_log_keys
 
 def model_train(userid, sid, device, features, epochs, batch_size, model):
     """

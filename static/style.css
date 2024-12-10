@@ -129,3 +129,8 @@ button:nth-child(3) {
 .btn-margin-top {
     margin-top: 10px;
 }
+
+.table thead th {
+    background-color: #007bff; 
+    color: white;
+}

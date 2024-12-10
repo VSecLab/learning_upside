@@ -16,6 +16,35 @@ def db_disconnect(mydb, mycursor):
     mycursor.close()
     mydb.close()
 
+def get_df_from_logID(logIDs):
+    """
+        Get the DataFrame for the given logIDs. 
+        logIDs is a dictionary with the sensor as key and the list of logIDs as value.
+        
+        :param dict logIDs: dict of logIDs for the sensors
+        :returns: DataFrame for the given logIDs and sensor
+        :rtype: pd.DataFrame
+    """
+    mydb, mycursor = db_connect()
+
+    logs_dict = {}
+    #keys = list[logIDs.keys()]
+    for sensor, id_logs in logIDs.items():
+        for id_log in id_logs:
+            sql = f"select X, Y, Z from {sensor.lower()} where ID_log = \"{id_log}\""
+            try:
+                mycursor.execute(sql)
+                values = mycursor.fetchall()
+                logs_dict[id_log] = pd.DataFrame(values, columns=["X", "Y", "Z"])
+                mydb.commit()
+            except mysql.connector.Error as err:
+                print(f"Error - logs: {err}")
+            print(f"log {id_log}: done")
+        print(f"sensor {sensor}: done")
+    db_disconnect(mydb, mycursor)
+
+    return logs_dict
+
 def get_user_seqIDs(userID, activity): 
     """
         Get the sequence IDs for the given user and activity.
