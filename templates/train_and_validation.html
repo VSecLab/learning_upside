@@ -98,6 +98,53 @@
         </div>
     </div>
     -->
+    {% if show_eval %}
+    <div class="container mt-5">
+        <h1 class="custom-header-h1">Evaluation Results</h1>
+        <div class="card shadow-lg">
+            <div class="card-body">
+                <div class="row mb-4">
+                    {% if conf_mat %}
+                        <div class="col-md-12 mb-4">
+                            <div class="card shadow-lg">
+                                <div class="card-body">
+                                    <h5 class="custom-header-h5 text-center">Confusion Matrix</h5>
+                                    <div class="text-center">
+                                        <img src="{{ url_for('static', filename = 'images/' + conf_mat) }}" alt="Confusion Matrix" class="responsive-img" style="padding-left: 130px;">
+                                    </div>
+                                </div>
+                            </div>
+                        </div> 
+                    {% endif %}
+                </div>
+                <div class="row mb-4">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Log</th>
+                                    <th scope="col" style="border-left: 1px solid #dee2e6;">Metric</th>
+                                    <th scope="col" style="border-left: 1px solid #dee2e6;">Activity</th>
+                                    <th scope="col" style="border-left: 1px solid #dee2e6;">Recognition Result</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log_id, values in eval_result.items() %}
+                                <tr>
+                                    <td>{{ log_id }}</td>
+                                    <td style="border-left: 1px solid #dee2e6;">{{ values.mse }}</td>
+                                    <td style="border-left: 1px solid #dee2e6;">{{ values.activity }}</td>
+                                    <td style="border-left: 1px solid #dee2e6;">{{ values.Recognised }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
     <div class = "container mt-5">
         <h1 class="custom-header-h1">Clustering on Variance</h1>
         <div class="card shadow-lg">
@@ -253,16 +300,6 @@
                                                                         <h5 class="custom-header-h5">Validate</h5>
                                                                         <div class="row mb-4">
                                                                             <form action="/validate_logs", method="POST"> 
-                                                                                <p class="card-text mt-3">Select the sensor or sensors for which to retrieve the logs to perform validation.</p>
-                                                                                <div class="row align-items-end">
-                                                                                    <div class="col-md-8">
-                                                                                        <label for="sensor" class="font-weight-bold fs-5">Sensor</label>
-                                                                                        <select class="form-control" id="sensor" name="sensor" required>
-                                                                                            <option value="Accelerometer">Accelerometer</option>
-                                                                                            <option value="Gyroscope">Gyroscope</option>
-                                                                                            <option value="Both">Both</option>
-                                                                                        </select>
-                                                                                    </div>
                                                                                     <div div class="col-md-4"">
                                                                                     {%if chosen_model %}
                                                                                         <button type="submit" onclick="submitForm('/validate_logs');" class="btn btn-secondary btn-margin-top">Validate</button>

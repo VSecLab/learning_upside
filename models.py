@@ -35,9 +35,14 @@ def create_model(df, epochs, batch_size, model_type):
         raise ValueError("Invalid model_type. Supported types are 'RNN', 'RNN3label', 'LSTMauto', 'LSTMlabel'.")
 
     model.compile(optimizer='adam', loss='mse')
-
-    # Model training
-    model.fit(df_scaled, df_scaled, epochs=epochs, batch_size=batch_size, verbose=1)
     
-    return model, scaler
+    # Model training
+    history = model.fit(df_scaled, df_scaled, epochs=epochs, batch_size=batch_size, verbose=1)
+    training_loss = history.history['loss']
+    training_loss = training_loss[-1]
+    
+    print("create_model() - Training loss:")
+    print(training_loss)
+    
+    return model, scaler, training_loss
 

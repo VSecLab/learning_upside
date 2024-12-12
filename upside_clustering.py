@@ -2,7 +2,6 @@ import matplotlib
 import numpy as np
 import pandas as pd
 from datetime import datetime
-import matplotlib.pyplot as pp
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA

@@ -33,44 +33,58 @@ def index():
 
 @app.route('/validate_logs', methods=['POST'])
 def validate_logs_page():
-    parameters = request.form
-    sensor = parameters.get('sensor')
     
     acc_dict = session.get('acc_dict', {})
     gyro_dict = session.get('gyro_dict', {})
-    test = session.get('test_log', {})   
-    test = {sensor: [k for k in test]}
+    train = session.get('train_log', {})
+    train_key_list = [k for k in train] # list of log_id used for the training
 
+    logs = session.get('logs', {}) # all log (train + test)
+    """print("\nvalidate_logs_page() - All logs for the given activity")
+    print(logs)"""
 
-    # I need to retrieve the logs not used for training
-    # if the user trained with the accelerometer, then I also need to retrieve the gyroscope logs for testing
-    train_sensor = session.get('sensor', [])
-    logs = session.get('logs', {})
-    if train_sensor == "Accelerometer":
-        test_log = {"Gyroscope": logs.get(sensor, [])}
-    elif train_sensor == "Gyroscope":
-        test_log = {"Accelerometer": logs.get(sensor, [])}
-    elif train_sensor == "Both":
-        test_log = logs
+    # retrive the logs that are not used for training 
+    # use them for validation
+    for sensor_key in logs.keys():
+        logs[sensor_key] = [log_id for log_id in logs[sensor_key] if log_id not in train_key_list]
 
-    combined_logs = {**test, **test_log}
+    # retrive all logs that are not used for training and validation
+    # use them as general log for validation 
+    # they relate to activities other than those on which the model was trained 
+    general_logs = {
+        'Accelerometer': [k for k, v in acc_dict.items()],
+        'Gyroscope': [k for k, v in gyro_dict.items()]
+    }
 
-    # I need to retrieve the logs not used for training
-    general_logs = {}
-    if sensor != "Both": 
-        general_logs = {sensor: [k for k, v in acc_dict.items()]}
-    elif sensor == "Both":
-        general_logs = {
-            'Accelerometer': [k for k, v in acc_dict.items()],
-            'Gyroscope': [k for k, v in gyro_dict.items()]
+    for sensor_key, log_ids in logs.items():
+        if sensor_key in general_logs:
+            general_logs[sensor_key] = [log_id for log_id in general_logs[sensor_key] if log_id not in log_ids]
+
+    filename, basename = mlw.evalutate_model_on_activity(logs, general_logs, session['chosen_model'], session['model_name'], session['scaler'])
+    #print("\nvalidate_logs_page() - filename", filename)
+
+    threshold = session['training_loss']
+
+    # Open the filename as a CSV file with pandas
+    df = pd.read_csv(filename)
+    df['Recognised'] = df['mse'].apply(lambda x: 'Yes' if x < threshold else 'No')
+    df.to_csv(filename, index=False)
+
+    # Save the results in a dictionary
+    eval_results = {}
+    for index, row in df.iterrows():
+        eval_results[row['log_id']] = {
+            'mse': row['mse'],
+            'activity': row['activity'],
+            'Recognised': row['Recognised']
         }
     
-    # TODO: use the function evalutate_model_on_activity() for the evaluation of the model
+    conf_matrix = mlw.confusion_matrix(df, session['model_name'], basename)
+
+    session['conf_matrix'] = conf_matrix
+
     
-
-
-
-    return render_template('train_and_validation.html', acc_dict = acc_dict, gyro_dict = gyro_dict)
+    return render_template('train_and_validation.html', acc_dict = acc_dict, gyro_dict = gyro_dict, eval_result = eval_results, conf_mat = session['conf_matrix'], show_eval = True, show_pca_plts = False, show_plts=False)#show_pca_plts = session['show_pca_plts'])
 
      
 
@@ -89,12 +103,15 @@ def process_logs():
     else: 
         sub_logs = logs
 
-    chosen_model, scaler, test_log = mlw.model_train_activity(sub_logs, epochs, batch_size, model)
-    
+    chosen_model, scaler, training_loss, test_log, train_log = mlw.model_train_activity(sub_logs, epochs, batch_size, model)
+    session['model_name'] = model
     session['chosen_model'] = chosen_model
     session['scaler'] = scaler
     session['test_log'] = test_log
+    session['train_log'] = train_log
+    #print("\nprocess_logs() - train_log", train_log)
     session['sensor'] = sensor
+    session['training_loss'] = training_loss    
 
 
     return render_template('train_and_validation.html', logs = logs, chosen_model = chosen_model, scaler = scaler, test_log = test_log, selected_activity = session['selected_activity'])
@@ -125,6 +142,7 @@ def process_activity():
         return render_template('train_and_validation.html', selected_activity = selected_activity, logs = logs, results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movment = session['user_movement'], acc_pca = session['acc_dict'], gyro_pca = session['gyro_dict'], plt_acc_pca = session['acc_plt'], plt_gyro_pca = session['gyro_plt'], show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
     elif session['show_normal_plts'] == True: 
         return render_template('train_and_validation.html', selected_activity = selected_activity, logs = logs, results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movment = session['user_movement'], acc_dict = session['acc_dict'], gyro_dict = session['gyro_dict'], plt_acc = session['acc_plt'], plt_gyro = session['gyro_plt'], show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
+
 @app.route('/variance')
 def variance_page():
     print("Variance page")

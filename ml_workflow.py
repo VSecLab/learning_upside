@@ -1,16 +1,108 @@
+
+import os
 import random
+import matplotlib
 import time as tm
 import numpy as np  
 import pandas as pd 
 import db_util as db
+import seaborn as sns
 import VisorData as vd
+import matplotlib.pyplot as plt
 
+from datetime import datetime
 from models import create_model
 
-#TODO this function 
+matplotlib.use('agg')
 
-def evalutate_model_on_activity(right_test_logs, wrong_test_logs, chosen_model, scaler):
-    pass
+def get_tp_fp_fn_tn(df):
+    if df.empty:
+        raise ValueError("The input DataFrame is empty.")
+    TP, FP, FN, TN = 0, 0, 0, 0
+    for index, row in df.iterrows():
+        if row['Recognised'] == 'Yes':
+            if row['activity'] == 'right':
+                TP += 1
+            else:
+                FP += 1
+        elif row['Recognised'] == 'No':
+            if row['activity'] == 'right':
+                FN += 1
+            else:
+                TN += 1
+
+    return TP, FP, FN, TN
+
+def confusion_matrix(df, model_name, filename):
+    if df.empty:
+        raise ValueError("The input DataFrame is empty.")
+
+    tp, fp, fn, tn = get_tp_fp_fn_tn(df)
+    print(f'TP: {tp}, FP: {fp}, FN: {fn}, TN: {tn}')
+
+    cm = np.array([[tp, fn], [fp, tn]])  # Costruisci la matrice di confusione direttamente
+    print('Confusion Matrix:')
+    print(cm)
+    directory = f'static/images/grims_confusion_matrix_{model_name}'
+    os.makedirs(directory, exist_ok=True)
+    path = f'{directory}/{filename}_confusion_matrix.png'
+
+    print(f'Confusion Matrix saved at: {path}')
+
+    plt.figure(figsize=(8, 5))
+    sns.heatmap(cm, annot=True, cmap = 'crest', fmt='d', xticklabels=['Predicted Right', 'Predicted Wrong'], yticklabels=['Actual Right', 'Actual Wrong'])
+    plt.title('Confusion Matrix')
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    plt.savefig(path)
+    plt.close()
+
+    partial_path = f'grims_confusion_matrix_{model_name}/{filename}_confusion_matrix.png'
+    return partial_path
+
+def evalutate_model_on_activity(right_test_logs, wrong_test_logs, chosen_model, model_name, scaler):
+    right_logs = db.get_df_from_logID(right_test_logs)
+
+    wrong_logs = db.get_df_from_logID(wrong_test_logs)
+
+    right_schema = {'log_id': [], 'mse': [], 'activity': 'right'}
+    right_mses = pd.DataFrame(right_schema)
+
+    wrong_schema = {'log_id': [], 'mse': [], 'activity': 'wrong'}
+    wrong_mses = pd.DataFrame(wrong_schema)
+
+    print('Right logs evaluation')
+    for log in right_logs:
+        print(f'Log evaluation: {log}')
+        df = right_logs[log]
+        mse = eval(chosen_model, scaler, df)
+        print(f'Mean Squared Error: {mse}')
+        right_mses.loc[len(right_mses)] = [log, mse, 'right']
+        
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    directory = f'ml_result/grims_resultsMse_{model_name}'
+    os.makedirs(directory, exist_ok=True)
+    file=f'{directory}/{model_name}_mse_' + timestamp + '.csv'
+    right_mses.to_csv(file, index=False)
+    
+    print('\nWrong logs evaluation')
+    for log in wrong_logs:
+        print(f'Log evaluation: {log}')
+        df = wrong_logs[log]
+        mse = eval(chosen_model, scaler, df)
+        print(f'Mean Squared Error: {mse}')
+        wrong_mses.loc[len(wrong_mses)] = [log, mse, 'wrong']
+    
+    directory = f'ml_result/grims_resultsMse_{model_name}'
+    os.makedirs(directory, exist_ok=True)
+    file=f'{directory}/{model_name}_mse_' + timestamp + '.csv'
+    if os.path.exists(file):
+        wrong_mses.to_csv(file, mode='a', header=False, index=False)
+    else:
+        wrong_mses.to_csv(file, index=False)
+    basename = f'{model_name}_mse_' + timestamp
+    
+    return file, basename
 
 
 def model_train_activity(logs, epochs, batch_size, model):
@@ -21,6 +113,8 @@ def model_train_activity(logs, epochs, batch_size, model):
     num_dataframes = len(logs_dict)
 
     x = (num_dataframes * 80) // 100
+    if x == 0:
+        x = 1
     
     # randomize the order of the dictionary
     keys = list(logs_dict.keys())
@@ -30,13 +124,18 @@ def model_train_activity(logs, epochs, batch_size, model):
     
     train_logs = {k: randomized_logs_dict[k] for k in list(randomized_logs_dict)[:x]}
     test_logs = {k: randomized_logs_dict[k] for k in list(randomized_logs_dict)[x:]}
+    train_log_keys = list(train_logs.keys())
     test_log_keys = list(test_logs.keys())
+    
+    print(f'Train logs: {train_logs}')
+    print(f'Test logs: {test_logs}')
 
+    
     df = pd.concat(train_logs.values(), ignore_index=True)
 
-    chosen_model, scaler = create_model(df, epochs, batch_size, model)
+    chosen_model, scaler, training_loss = create_model(df, epochs, batch_size, model)
 
-    return chosen_model, scaler, test_log_keys
+    return chosen_model, scaler, training_loss, test_log_keys, train_log_keys
 
 def model_train(userid, sid, device, features, epochs, batch_size, model):
     """

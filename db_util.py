@@ -39,8 +39,7 @@ def get_df_from_logID(logIDs):
                 mydb.commit()
             except mysql.connector.Error as err:
                 print(f"Error - logs: {err}")
-            print(f"log {id_log}: done")
-        print(f"sensor {sensor}: done")
+            print(f"get_df_from_logID - sensor {sensor} - log {id_log}: done")
     db_disconnect(mydb, mycursor)
 
     return logs_dict

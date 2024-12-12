@@ -145,6 +145,9 @@ def evaluate_model(modello, scaler, df):
 
     predictions_scaled = modello.predict(df_scaled)
 
+    # grims TODO: penso sia necessario effettuare una inverse_transform per riportare i dati alla scala originale
+    # sia quelli di input (df_scaled) che quelli di output (predictions_scaled)
+    
     # Calcolo dell'errore di ricostruzione (Mean Squared Error)
     mse = np.mean(np.power(df_scaled - predictions_scaled[:, :, np.newaxis], 2))
 
