@@ -1,7 +1,7 @@
 import io
 import pandas as pd
 import mysql.connector
-from global_ml import check
+# from global_ml import check
 import ml_workflow as mlw
 import upside_clustering as uc
 from flask_session import Session
@@ -31,6 +31,8 @@ def get_db_connection():
 def index():
     return render_template('index.html')
 
+
+# TODO: validate only on the gyroscope log and accelerometer log 
 @app.route('/validate_logs', methods=['POST'])
 def validate_logs_page():
     
@@ -40,59 +42,51 @@ def validate_logs_page():
     train_key_list = [k for k in train] # list of log_id used for the training
 
     logs = session.get('logs', {}) # all log (train + test)
-    """print("\nvalidate_logs_page() - All logs for the given activity")
-    print(logs)"""
 
     # retrive the logs that are not used for training 
     # use them for validation
+    acc_logs = {}
+    gyro_logs = {}
     for sensor_key in logs.keys():
-        logs[sensor_key] = [log_id for log_id in logs[sensor_key] if log_id not in train_key_list]
+        if sensor_key == 'Accelerometer':
+            acc_logs[sensor_key] = [log_id for log_id in logs[sensor_key] if log_id not in train_key_list]
+        else:
+            gyro_logs[sensor_key] = [log_id for log_id in logs[sensor_key] if log_id not in train_key_list]
+    
+    print("\nvalidate_logs_page() - acc_logs")
+    print(acc_logs)
+    print("\nvalidate_logs_page() - gyro_logs")
+    print(gyro_logs)
+
 
     # retrive all logs that are not used for training and validation
     # use them as general log for validation 
     # they relate to activities other than those on which the model was trained 
-    general_logs = {
-        'Accelerometer': [k for k, v in acc_dict.items()],
-        'Gyroscope': [k for k, v in gyro_dict.items()]
-    }
+    general_acc_logs = {'Accelerometer': [k for k, v in acc_dict.items()]}
+    general_gyro_logs = {'Gyroscope': [k for k, v in gyro_dict.items()]}
 
     for sensor_key, log_ids in logs.items():
-        if sensor_key in general_logs:
-            general_logs[sensor_key] = [log_id for log_id in general_logs[sensor_key] if log_id not in log_ids]
-
-    filename, basename = mlw.evalutate_model_on_activity(logs, general_logs, session['chosen_model'], session['model_name'], session['scaler'])
-    #print("\nvalidate_logs_page() - filename", filename)
-
+        if sensor_key in general_acc_logs:
+            general_acc_logs[sensor_key] = [log_id for log_id in general_acc_logs[sensor_key] if log_id not in log_ids]
+        if sensor_key in general_gyro_logs:
+            general_gyro_logs[sensor_key] = [log_id for log_id in general_gyro_logs[sensor_key] if log_id not in log_ids]
+    
     threshold = session['training_loss']
+    acc_eval_res, acc_conf_matrix = mlw.eval_models("Accelerometer", threshold, acc_logs, general_acc_logs, session['chosen_model'], session['model_name'], session['scaler'])
+    gyro_eval_res, gyro_conf_matrix = mlw.eval_models("Gyroscope", threshold, gyro_logs, general_gyro_logs, session['chosen_model'], session['model_name'], session['scaler'])
 
-    # Open the filename as a CSV file with pandas
-    df = pd.read_csv(filename)
-    df['Recognised'] = df['mse'].apply(lambda x: 'Yes' if x < threshold else 'No')
-    df.to_csv(filename, index=False)
-
-    # Save the results in a dictionary
-    eval_results = {}
-    for index, row in df.iterrows():
-        eval_results[row['log_id']] = {
-            'mse': row['mse'],
-            'activity': row['activity'],
-            'Recognised': row['Recognised']
-        }
-    
-    conf_matrix = mlw.confusion_matrix(df, session['model_name'], basename)
-
-    session['conf_matrix'] = conf_matrix
+    session['acc_conf_matrix'] = acc_conf_matrix
+    session['gyro_conf_matrix'] = gyro_conf_matrix 
 
     
-    return render_template('train_and_validation.html', acc_dict = acc_dict, gyro_dict = gyro_dict, eval_result = eval_results, conf_mat = session['conf_matrix'], show_eval = True, show_pca_plts = False, show_plts=False)#show_pca_plts = session['show_pca_plts'])
-
-     
+    return render_template('train_and_validation.html', train_sensor = session['sensor'], acc_dict = acc_dict, gyro_dict = gyro_dict, acc_eval_result = acc_eval_res, gyro_eval_result = gyro_eval_res, acc_conf_mat = session['acc_conf_matrix'], gyro_conf_mat = session['gyro_conf_matrix'], show_eval = True, show_pca_plts = False, show_plts=False)#show_pca_plts = session['show_pca_plts'])
 
 @app.route('/process_logs', methods=['POST'])
 def process_logs(): 
     parameters = request.form
     epochs = int(parameters.get('epochs'))
     batch_size = int(parameters.get('batch_size'))
+    percentage = int(parameters.get('percentage'))
     sensor = parameters.get('sensor')
     model = parameters.get('model')
 
@@ -103,7 +97,7 @@ def process_logs():
     else: 
         sub_logs = logs
 
-    chosen_model, scaler, training_loss, test_log, train_log = mlw.model_train_activity(sub_logs, epochs, batch_size, model)
+    chosen_model, scaler, training_loss, test_log, train_log = mlw.model_train_activity(sub_logs, epochs, batch_size, percentage, model)
     session['model_name'] = model
     session['chosen_model'] = chosen_model
     session['scaler'] = scaler
@@ -115,9 +109,6 @@ def process_logs():
 
 
     return render_template('train_and_validation.html', logs = logs, chosen_model = chosen_model, scaler = scaler, test_log = test_log, selected_activity = session['selected_activity'])
-
-
-
 
 @app.route('/process_activity', methods=['POST'])
 def process_activity():
@@ -143,7 +134,7 @@ def process_activity():
     elif session['show_normal_plts'] == True: 
         return render_template('train_and_validation.html', selected_activity = selected_activity, logs = logs, results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movment = session['user_movement'], acc_dict = session['acc_dict'], gyro_dict = session['gyro_dict'], plt_acc = session['acc_plt'], plt_gyro = session['gyro_plt'], show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
 
-@app.route('/variance')
+@app.route('/variance', methods=['POST'])
 def variance_page():
     print("Variance page")
     connection = get_db_connection()
@@ -159,8 +150,12 @@ def variance_page():
     df_gyroscope = pd.DataFrame(results)
     session['df_gyroscope'] = df_gyroscope
 
-    acc_df_0, acc_df_1, plt_acc = uc.ml_kmeans(df_accelerometer, "Accelerometer")
-    gyro_df_0, gyro_df_1, plt_gyro = uc.ml_kmeans(df_gyroscope, "Gyroscope")
+    parameters = request.form
+    acc_iteration = int(parameters.get('acc_iteration'))
+    gyro_iteration = int(parameters.get('gyro_iteration'))
+
+    acc_df_0, acc_df_1, plt_acc = uc.ml_kmeans(df_accelerometer, "Accelerometer", acc_iteration)
+    gyro_df_0, gyro_df_1, plt_gyro = uc.ml_kmeans(df_gyroscope, "Gyroscope", gyro_iteration)
 
     # Save ID_movement and corresponding variances in a dictionary
     acc_dict = {}
@@ -202,7 +197,7 @@ def variance_page():
 
     return render_template('train_and_validation.html', results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movement = session['user_movement'], acc_dict = acc_dict, gyro_dict = gyro_dict, plt_acc = plt_acc, plt_gyro = plt_gyro, show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
 
-@app.route('/variance_pca')
+@app.route('/variance_pca', methods = ['POST'])
 def variance_pca_page(): 
     print("Variance PCA page")
     connection = get_db_connection()
@@ -218,8 +213,12 @@ def variance_pca_page():
     df_gyroscope = pd.DataFrame(results)
     session['df_gyroscope'] = df_gyroscope
 
-    acc_df_0, acc_df_1, plt_acc_pca = uc.PCA_kmeans(df_accelerometer, "Accelerometer")
-    gyro_df_0, gyro_df_1, plt_gyro_pca = uc.PCA_kmeans(df_gyroscope, "Gyroscope")
+    parameters = request.form
+    acc_iteration = int(parameters.get('acc_iteration'))
+    gyro_iteration = int(parameters.get('gyro_iteration'))
+
+    acc_df_0, acc_df_1, plt_acc_pca = uc.PCA_kmeans(df_accelerometer, "Accelerometer", acc_iteration)
+    gyro_df_0, gyro_df_1, plt_gyro_pca = uc.PCA_kmeans(df_gyroscope, "Gyroscope", gyro_iteration)
 
     # Save ID_movement and corresponding variances in a dictionary
     acc_dict = {}
@@ -260,7 +259,6 @@ def variance_pca_page():
     session['gyro_plt'] = plt_gyro_pca
  
     return render_template('train_and_validation.html', results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movment = session['user_movement'], acc_pca = acc_dict, gyro_pca = gyro_dict, plt_acc_pca = plt_acc_pca, plt_gyro_pca = plt_gyro_pca, show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
-
 
 @app.route('/train_and_validation')
 def train_and_validation_page():

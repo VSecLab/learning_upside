@@ -56,14 +56,6 @@ button:nth-child(1) {
     background-color: #007bff; /* Blu */
 }
 
-button:nth-child(2) {
-    background-color: #dc3545; /* Rosso */
-}
-
-button:nth-child(3) {
-    background-color: #ffc107; /* Giallo */
-}
-
 /* Aggiungi stili per altri pulsanti qui */
 
 /* Stili per la dimensione della pagina */

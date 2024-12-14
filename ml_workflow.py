@@ -1,4 +1,3 @@
-
 import os
 import random
 import matplotlib
@@ -33,7 +32,7 @@ def get_tp_fp_fn_tn(df):
 
     return TP, FP, FN, TN
 
-def confusion_matrix(df, model_name, filename):
+def confusion_matrix(df, model_name, sensor, filename):
     if df.empty:
         raise ValueError("The input DataFrame is empty.")
 
@@ -45,19 +44,18 @@ def confusion_matrix(df, model_name, filename):
     print(cm)
     directory = f'static/images/grims_confusion_matrix_{model_name}'
     os.makedirs(directory, exist_ok=True)
-    path = f'{directory}/{filename}_confusion_matrix.png'
+    path = f'{directory}/{sensor}_{filename}_confusion_matrix.png'
 
     print(f'Confusion Matrix saved at: {path}')
 
-    plt.figure(figsize=(8, 5))
-    sns.heatmap(cm, annot=True, cmap = 'crest', fmt='d', xticklabels=['Predicted Right', 'Predicted Wrong'], yticklabels=['Actual Right', 'Actual Wrong'])
-    plt.title('Confusion Matrix')
+    plt.figure(figsize=(10, 7))
+    sns.heatmap(cm, annot=True, cmap = 'crest', fmt='d', xticklabels=['Predicted Positive', 'Predicted Negative'], yticklabels=['Actual Positive', 'Actual Negative'])
     plt.xlabel('Predicted')
     plt.ylabel('Actual')
     plt.savefig(path)
     plt.close()
 
-    partial_path = f'grims_confusion_matrix_{model_name}/{filename}_confusion_matrix.png'
+    partial_path = f'grims_confusion_matrix_{model_name}/{sensor}_{filename}_confusion_matrix.png'
     return partial_path
 
 def evalutate_model_on_activity(right_test_logs, wrong_test_logs, chosen_model, model_name, scaler):
@@ -104,18 +102,37 @@ def evalutate_model_on_activity(right_test_logs, wrong_test_logs, chosen_model, 
     
     return file, basename
 
+def eval_models(sensor, threshold, right_test_logs, wrong_test_logs, chosen_model, model_name, scaler):
+    filename, basename = evalutate_model_on_activity(right_test_logs, wrong_test_logs, chosen_model, model_name, scaler)
+    #print("\nvalidate_logs_page() - filename", filename)
 
-def model_train_activity(logs, epochs, batch_size, model):
+    # Open the filename as a CSV file with pandas
+    df = pd.read_csv(filename)
+    df['Recognised'] = df['mse'].apply(lambda x: 'Yes' if x < threshold else 'No')
+    df.to_csv(filename, index=False)
+
+    # Save the results in a dictionary
+    eval_results = {}
+    for index, row in df.iterrows():
+        eval_results[row['log_id']] = {
+            'mse': row['mse'],
+            'activity': row['activity'],
+            'Recognised': row['Recognised']
+        }
+    
+    conf_matrix = confusion_matrix(df, model_name, sensor, basename)
+    return eval_results, conf_matrix
+
+def model_train_activity(logs, epochs, batch_size, percentage, model):
     logs_dict = db.get_df_from_logID(logs)
 
     #print(logs_dict)
 
     num_dataframes = len(logs_dict)
-
-    x = (num_dataframes * 80) // 100
+    
+    x = (num_dataframes * percentage) // 100
     if x == 0:
         x = 1
-    
     # randomize the order of the dictionary
     keys = list(logs_dict.keys())
     random.shuffle(keys)
@@ -127,8 +144,8 @@ def model_train_activity(logs, epochs, batch_size, model):
     train_log_keys = list(train_logs.keys())
     test_log_keys = list(test_logs.keys())
     
-    print(f'Train logs: {train_logs}')
-    print(f'Test logs: {test_logs}')
+    print(f'Train logs: {len(train_logs)}')
+    print(f'Test logs: {len(test_logs)}')
 
     
     df = pd.concat(train_logs.values(), ignore_index=True)
@@ -220,8 +237,12 @@ def eval(model, scaler, df):
 
     predictions_scaled = model.predict(df_scaled)
 
-    # compute the mean squared error 
-    mse = np.mean(np.power(df_scaled - predictions_scaled[:, :, np.newaxis], 2))
+    # Check if shapes match before computing MSE
+    if df_scaled.shape == predictions_scaled.shape:
+        # compute the mean squared error 
+        mse = np.mean(np.power(df_scaled - predictions_scaled, 2))
+    else:
+        mse = np.mean(np.power(df_scaled - predictions_scaled[:, :, np.newaxis], 2))
 
     return mse
 
