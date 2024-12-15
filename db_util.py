@@ -2,6 +2,16 @@ import pandas as pd
 import mysql.connector
  #sql alchemy
 def db_connect(): 
+    """
+    Establishes a connection to the MySQL database and returns the connection and cursor objects.
+
+    Returns
+    -------
+    mydb : mysql.connector.connection.MySQLConnection
+        The MySQL database connection object.
+    mycursor : mysql.connector.cursor.MySQLCursor
+        The MySQL cursor object for executing queries.
+    """
     mydb = mysql.connector.connect(
     host="localhost",
     user="root",
@@ -13,17 +23,36 @@ def db_connect():
     return mydb, mycursor
 
 def db_disconnect(mydb, mycursor):
+    """
+    Closes the database cursor and connection.
+
+    Parameters
+    ----------
+    mydb : mysql.connector.connection.MySQLConnection
+        The database connection object to be closed.
+    mycursor : mysql.connector.cursor.MySQLCursor
+        The database cursor object to be closed.
+
+    Returns
+    -------
+    None
+    """
     mycursor.close()
     mydb.close()
 
 def get_df_from_logID(logIDs):
     """
-        Get the DataFrame for the given logIDs. 
-        logIDs is a dictionary with the sensor as key and the list of logIDs as value.
-        
-        :param dict logIDs: dict of logIDs for the sensors
-        :returns: DataFrame for the given logIDs and sensor
-        :rtype: pd.DataFrame
+    Get the DataFrame for the given logIDs.
+
+    Parameters
+    ----------
+    logIDs : dict
+        Dictionary with the sensor as key and the list of logIDs as value.
+
+    Returns
+    -------
+    dict
+        Dictionary of DataFrames for the given logIDs and sensor.
     """
     mydb, mycursor = db_connect()
 
@@ -46,17 +75,24 @@ def get_df_from_logID(logIDs):
 
 def get_user_seqIDs(userID, activity): 
     """
-        Get the sequence IDs for the given user and activity.
-      
-        :param int userID: ID of the User
-        :param str activity: Name of the activity
-        :returns: list of sequence IDs 
-        :rtype: list
+    Get the sequence IDs for the given user and activity.
+
+    Parameters
+    ----------
+    userID : int
+        ID of the User.
+    activity : str
+        Name of the activity.
+
+    Returns
+    -------
+    list
+        List of sequence IDs.
     """
     mydb, mycursor = db_connect()
 
     # grims: retrive the sequence IDs for the given user and activity
-    sql = f"select distinct seqID from movimento as m where m.ID_utente = {userID} and ID_attivita = (select ID_attivita from attivita where nome_attivita = \"{activity}\")"
+    sql = f"select distinct seqID from movement as m where m.ID_user = {userID} and ID_activity = (select ID_activity from activity where activity_name = \"{activity}\")"
     
     try: 
         mycursor.execute(sql)
@@ -73,15 +109,21 @@ def get_user_seqIDs(userID, activity):
 
 def get_users(activity):
     """
-        Retrive the names of all the users for the given activity.
+    Retrieve the names of all the users for the given activity.
 
-        :param str activity: Name of the activity
-        :returns: list of users for the given activity
-        :rtype: list
+    Parameters
+    ----------
+    activity : str
+        Name of the activity.
+
+    Returns
+    -------
+    list
+        List of users for the given activity.
     """
     mydb, mycursor = db_connect()
 
-    sql = "SELECT u.Nome FROM utente u WHERE u.ID IN (SELECT DISTINCT e.ID_utente FROM esecuzione e JOIN attivita a ON e.ID_attivita = a.ID_attivita WHERE a.nome_attivita = (%s));"
+    sql = "SELECT u.Name FROM user u WHERE u.ID IN (SELECT DISTINCT e.ID_user FROM execution e JOIN activity a ON e.ID_activity = a.ID_activity WHERE a.activity_name = (%s));"
 
     try: 
         mycursor.execute(sql, (activity,))
@@ -96,14 +138,23 @@ def get_users(activity):
 
 def get_user_log_onFeatures(userid, sid, device, features):
     """
-        Get the DataFrame of the given user, for the given sequence number and the given features. 
+    Get the DataFrame of the given user, for the given sequence number and the given features.
 
-        :param int userid: ID for the User
-        :param str sid: sequence number
-        :param list features: list of features to be used for the model 
-        :returns: DataFrame for the given user and features
-        :rtype: pd.DataFrame
-        
+    Parameters
+    ----------
+    userid : int
+        ID for the User.
+    sid : str
+        Sequence number.
+    device : str
+        UDI of the device.
+    features : list
+        List of features to be used for the model.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame for the given user and features.
     """
     orientation = ["Pitch", "Yaw", "Roll"]
     position = ["X", "Y", "Z"]
@@ -113,7 +164,7 @@ def get_user_log_onFeatures(userid, sid, device, features):
     mydb, mycursor = db_connect()
 
     # grims: create the model for the given user and sequence
-    sql = "select UDI from dispositivo where tipo = (%s)"
+    sql = "select UDI from device where type = (%s)"
     
     # grims: retrive the UDI of the device  
     try: 
@@ -132,7 +183,7 @@ def get_user_log_onFeatures(userid, sid, device, features):
     print("SID: ", sid)
     # grims: retrive the ID_log
     #sql = f"select ID_movimento from movimento where ID_utente = {userid} and sensore = \"{sensor}\" and UDI = \"{udi[0]}\" and ID_movimento LIKE \"{str(sid)}\_%\""
-    sql = f"select ID_movimento from movimento where ID_utente = {userid} and sensore = \"{sensor}\" and UDI = \"{udi[0]}\" and seqID = {sid}"
+    sql = f"select ID_movement from movement where ID_user = {userid} and sensor = \"{sensor}\" and UDI = \"{udi[0]}\" and seqID = {sid}"
     
     try:    
         mycursor.execute(sql)
@@ -164,16 +215,22 @@ def get_user_log_onFeatures(userid, sid, device, features):
 
 def get_userID(user): 
     """
-        Get the ID for the given user.
-        
-        :param str user: name of the user
-        :returns: ID for the given user 
-        :rtype: int
+    Get the ID for the given user.
+
+    Parameters
+    ----------
+    user : str
+        Name of the user.
+
+    Returns
+    -------
+    int
+        ID for the given user.
     """
 
     mydb, mycursor = db_connect()
 
-    sql = "select u.ID from utente as u where u.Nome = (%s)"
+    sql = "select u.ID from user as u where u.Name = (%s)"
     
     try: 
         mycursor.execute(sql, (user,))
@@ -187,14 +244,23 @@ def get_userID(user):
 
 def getAll_userdf_onFeatures(userID, seqIDs, device, features):
     """
-        Get a dictionary of DataFrames for the given user, for the given sequence numbers and the given features.
-        
-        :param int user: userID of the user
-        :param list seqIDs: list of sequence numbers
-        :param str device: name of the device
-        :param list features: list of features to be used for the model 
-        :returns: dictionary of DataFrames for the given user and features
-        :rtype: dict
+    Get a dictionary of DataFrames for the given user, sequence numbers, and features.
+
+    Parameters
+    ----------
+    userID : int
+        User ID of the user.
+    seqIDs : list
+        List of sequence numbers.
+    device : str
+        Name of the device.
+    features : list
+        List of features to be used for the model.
+
+    Returns
+    -------
+    dict
+        Dictionary of DataFrames for the given user and features.
     """
 
     userdf = {}
@@ -205,6 +271,185 @@ def getAll_userdf_onFeatures(userID, seqIDs, device, features):
 
     #print(userdf)
     return userdf
+
+def get_eventID_by_event_name(event_name): 
+    """
+    Get the ID for the given event.
+
+    Parameters
+    ----------
+    event_name : str
+        Name of the event.
+
+    Returns
+    -------
+    list
+        List of event IDs for the given event name.
+    """
+
+    mydb, mycursor = db_connect()
+
+    sql = f"SELECT ID_event FROM event where event_name = \"{event_name}\""
+    
+    try: 
+        mycursor.execute(sql)
+        id = mycursor.fetchone()
+        mydb.commit()
+    except mysql.connector.Error as err:
+        print(f"Error - ID: {err}")
+    db_disconnect(mydb, mycursor)
+
+    return id[0]
+
+def get_userIDs_by_eventID(event_id): 
+    """
+    Get the list of userIDs for the given eventID.
+
+    Parameters
+    ----------
+    event_id : int
+        ID of the event.
+
+    Returns
+    -------
+    list
+        List of userIDs for the given eventID.
+    """
+
+    mydb, mycursor = db_connect()
+
+    try: 
+        mycursor.execute(f"select ID_user from participation where ID_event = {event_id}")
+        ids = mycursor.fetchall()
+        mydb.commit()
+    except mysql.connector.Error as err:
+        print(f"Error - ID: {err}")
+    db_disconnect(mydb, mycursor)
+
+    ids = [row[0] for row in ids]
+
+    return ids
+
+def get_userIDs_and_movementID_by_eventID(event_id): 
+    """
+    Get the list of userIDs and movementIDs for the given eventID.
+
+    Parameters
+    ----------
+    event_id : int
+        ID of the event.
+
+    Returns
+    -------
+    dict
+        Dictionary with userIDs as keys and lists of movementIDs as values.
+    """
+
+    mydb, mycursor = db_connect()
+    sql = f"select ID_user, ID_movement from movement where ID_user in (select ID_user from participation where ID_event = {event_id})"
+
+    try: 
+        mycursor.execute(sql)
+        user_movement_list = mycursor.fetchall()
+        mydb.commit()
+    except mysql.connector.Error as err:
+        print(f"Error - ID: {err}")
+    db_disconnect(mydb, mycursor)
+
+    # Convert list to dictionary
+    user_movement = {}
+    for user_id, movement_id in user_movement_list:
+        if user_id not in user_movement:
+            user_movement[user_id] = []
+        user_movement[user_id].append(movement_id)
+
+    return user_movement
+
+def get_activityName_by_eventID(event_id):
+    """
+    Get the list of activities for the given event ID.
+
+    Parameters
+    ----------
+    event_id : int
+        ID of the event.
+
+    Returns
+    -------
+    list
+        List of activities corresponding to the given event ID.
+    """
+
+    mydb, mycursor = db_connect()
+    
+    try: 
+        mycursor.execute(f"select activity_name from activity where ID_activity in (select a.ID_activity from association as a join event as e on a.ID_event and a.ID_event = {event_id})")
+        activity_name = mycursor.fetchall()
+        mydb.commit()
+    except mysql.connector.Error as err:
+        print(f"Error - ID: {err}")
+    db_disconnect(mydb, mycursor)
+
+    activity = [row[0] for row in activity_name] 
+
+    return activity
+
+def get_devices_by_eventID(event_id): 
+    """
+    Get the list of devices for the given event ID.
+
+    Parameters
+    ----------
+    event_id : int
+        ID of the event.
+
+    Returns
+    -------
+    list
+        List of devices for the given event ID.
+    """
+
+    mydb, mycursor = db_connect()
+    
+    try: 
+        mycursor.execute(f"select distinct type from device as d where d.ID_activity in (select distinct a.ID_activity from association as a join event as e on a.ID_event and a.ID_event = {event_id})")
+        devices = mycursor.fetchall()
+        mydb.commit()
+    except mysql.connector.Error as err:
+        print(f"Error - ID: {err}")
+    db_disconnect(mydb, mycursor)
+
+    devices = [row[0] for row in devices]
+    return devices
+
+def get_username(userid): 
+    """
+    Get the name for the given user.
+
+    Parameters
+    ----------
+    userid : int
+        ID of the user.
+
+    Returns
+    -------
+    str
+        Name corresponding to the given user ID.
+    """
+
+    mydb, mycursor = db_connect()
+
+    sql = f"select Name from user where ID = {userid}"
+    
+    try: 
+        mycursor.execute(sql)
+        name = mycursor.fetchone()
+        mydb.commit()
+    except mysql.connector.Error as err:
+        print(f"Error - ID: {err}")
+    db_disconnect(mydb, mycursor)
+
+    return name[0]
 
 if __name__ == "__main__":
     #get_user_seqIDs("AlessandroMercurio", "metalearning")

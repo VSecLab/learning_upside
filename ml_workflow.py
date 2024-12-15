@@ -14,37 +14,111 @@ from models import create_model
 
 matplotlib.use('agg')
 
-def get_tp_fp_fn_tn(df):
+def get_tp_fp_fn_tn(df, event_name):
+    """
+    Calculate the number of true positives (TP), false positives (FP), 
+    false negatives (FN), and true negatives (TN) based on the given DataFrame and event name.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The input DataFrame containing the data to be evaluated.
+    event_name : str
+        The name of the event to be used for evaluation. 
+        It can be either "UPSIDE" or "metalearning".
+
+    Returns
+    -------
+    tuple
+        A tuple containing four integers (TP, FP, FN, TN), representing the counts of 
+        true positives, false positives, false negatives, and true negatives, respectively.
+
+    Raises
+    ------
+    ValueError
+        If the input DataFrame is empty.
+
+    Notes
+    -----
+    This function evaluates the provided data to compute confusion matrix metrics 
+    (TP, FP, FN, TN) based on the specified `event_name`. The event name determines 
+    the criteria for evaluation.
+    """
     if df.empty:
         raise ValueError("The input DataFrame is empty.")
     TP, FP, FN, TN = 0, 0, 0, 0
     for index, row in df.iterrows():
         if row['Recognised'] == 'Yes':
-            if row['activity'] == 'right':
-                TP += 1
-            else:
-                FP += 1
+            if event_name == "UPSIDE":
+                if row['activity'] == 'right':
+                    TP += 1
+                else:
+                    FP += 1
+            elif event_name == "metalearning":
+                if row['auth_user'] == 'right':
+                    TP += 1
+                else:
+                    FP += 1
         elif row['Recognised'] == 'No':
-            if row['activity'] == 'right':
-                FN += 1
-            else:
-                TN += 1
+            if event_name == "UPSIDE":
+                if row['activity'] == 'right':
+                    FN += 1
+                else:
+                    TN += 1
+            elif event_name == "metalearning":
+                if row['auth_user'] == 'right':
+                    FN += 1
+                else:
+                    TN += 1
 
     return TP, FP, FN, TN
 
-def confusion_matrix(df, model_name, sensor, filename):
+def confusion_matrix(df, model_name, sensor, filename, event_name):
+    """
+    Generates and saves a confusion matrix for a given model and dataset.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The input DataFrame containing the data.
+    model_name : str
+        The name of the model.
+    sensor : str
+        The sensor used for data collection.
+    filename : str
+        The name of the file to save the confusion matrix.
+    event_name : str
+        The name of the event being analyzed.
+
+    Returns
+    -------
+    str
+        The relative path to the saved confusion matrix image.
+
+    Raises
+    ------
+    ValueError
+        If the input DataFrame is empty.
+
+    Notes
+    -----
+    The function calculates the true positives (TP), false positives (FP), 
+    false negatives (FN), and true negatives (TN) from the DataFrame using 
+    the `get_tp_fp_fn_tn` function. It then constructs a confusion matrix, 
+    saves it as an image file, and returns the relative path to the saved image.
+    """
     if df.empty:
         raise ValueError("The input DataFrame is empty.")
 
-    tp, fp, fn, tn = get_tp_fp_fn_tn(df)
+    tp, fp, fn, tn = get_tp_fp_fn_tn(df, event_name)
     print(f'TP: {tp}, FP: {fp}, FN: {fn}, TN: {tn}')
 
     cm = np.array([[tp, fn], [fp, tn]])  # Costruisci la matrice di confusione direttamente
     print('Confusion Matrix:')
     print(cm)
-    directory = f'static/images/grims_confusion_matrix_{model_name}'
+    directory = f'static/images/{event_name}_grims_confusion_matrix_{model_name}'
     os.makedirs(directory, exist_ok=True)
-    path = f'{directory}/{sensor}_{filename}_confusion_matrix.png'
+    path = f'{directory}/{event_name}_{sensor}_{filename}_confusion_matrix.png'
 
     print(f'Confusion Matrix saved at: {path}')
 
@@ -55,10 +129,33 @@ def confusion_matrix(df, model_name, sensor, filename):
     plt.savefig(path)
     plt.close()
 
-    partial_path = f'grims_confusion_matrix_{model_name}/{sensor}_{filename}_confusion_matrix.png'
+    partial_path = f'{event_name}_grims_confusion_matrix_{model_name}/{event_name}_{sensor}_{filename}_confusion_matrix.png'
     return partial_path
 
 def evalutate_model_on_activity(right_test_logs, wrong_test_logs, chosen_model, model_name, scaler):
+    """
+    Evaluates a given model on right and wrong activity logs and saves the results to CSV files.
+
+    Parameters
+    ----------
+    right_test_logs : list
+        List of log IDs for the right activity.
+    wrong_test_logs : list
+        List of log IDs for the wrong activity.
+    chosen_model : object
+        The machine learning model to be evaluated.
+    model_name : str
+        The name of the model, used for naming the result files.
+    scaler : object
+        The scaler used to preprocess the data before evaluation.
+
+    Returns
+    -------
+    str
+        The path to the CSV file containing the evaluation results.
+    str
+        The base name of the file.
+    """
     right_logs = db.get_df_from_logID(right_test_logs)
 
     wrong_logs = db.get_df_from_logID(wrong_test_logs)
@@ -102,7 +199,37 @@ def evalutate_model_on_activity(right_test_logs, wrong_test_logs, chosen_model, 
     
     return file, basename
 
-def eval_models(sensor, threshold, right_test_logs, wrong_test_logs, chosen_model, model_name, scaler):
+def eval_models(sensor, threshold, right_test_logs, wrong_test_logs, chosen_model, model_name, scaler, event_name):
+    """
+    Evaluate the performance of a machine learning model on a given activity and compute the confusion matrix.
+
+    Parameters
+    ----------
+    sensor : str
+        The sensor type used for evaluation.
+    threshold : float
+        The threshold value for determining recognition.
+    right_test_logs : str
+        Path to the logs of correctly classified activities.
+    wrong_test_logs : str
+        Path to the logs of incorrectly classified activities.
+    chosen_model : object
+        The machine learning model to be evaluated.
+    model_name : str
+        The name of the machine learning model.
+    scaler : object
+        The scaler used for data normalization.
+    event_name : str
+        The name of the event being evaluated.
+
+    Returns
+    -------
+    dict
+        A dictionary containing the mean squared error (MSE) for each log.
+    str
+        The path to the confusion matrix.
+    """
+
     filename, basename = evalutate_model_on_activity(right_test_logs, wrong_test_logs, chosen_model, model_name, scaler)
     #print("\nvalidate_logs_page() - filename", filename)
 
@@ -120,10 +247,40 @@ def eval_models(sensor, threshold, right_test_logs, wrong_test_logs, chosen_mode
             'Recognised': row['Recognised']
         }
     
-    conf_matrix = confusion_matrix(df, model_name, sensor, basename)
+    conf_matrix = confusion_matrix(df, model_name, sensor, basename, event_name)
     return eval_results, conf_matrix
 
 def model_train_activity(logs, epochs, batch_size, percentage, model):
+    """
+    Trains a machine learning model using a specified percentage of log data for training.
+
+    Parameters
+    ----------
+    logs : list
+        List of log identifiers to retrieve data from the database.
+    epochs : int
+        Number of epochs to train the model.
+    batch_size : int
+        Size of the batches used in training.
+    percentage : int
+        Percentage of the log data to be used for training.
+    model : str
+        The type of model to be created and trained.
+
+    Returns
+    -------
+    keras.Model
+        The trained machine learning model.
+    sklearn.preprocessing.StandardScaler
+        The scaler used to normalize the features.
+    float
+        The training loss of the model.
+    list
+        List of log identifiers used for testing.
+    list
+        List of log identifiers used for training.
+    """
+    
     logs_dict = db.get_df_from_logID(logs)
 
     #print(logs_dict)
@@ -158,45 +315,73 @@ def model_train(userid, sid, device, features, epochs, batch_size, model):
     """
     Trains a machine learning model based on user-specific data and parameters.
 
-    :param int userid: the ID of the user for whom the model is being trained.
-    :param str sid: the session ID associated with the user.
-    :param str device: the device from which the data is collected.
-    :param list features: a list of features to be used for training the model.
-    :param int epochs: the number of epochs for training the model.
-    :param int batch_size: the batch size for training the model.
-    :param str model: the type of model to be trained.
+    Parameters
+    ----------
+    userid : int
+        The ID of the user for whom the model is being trained.
+    sid : str
+        The session ID associated with the user.
+    device : str
+        The device from which the data is collected.
+    features : list
+        A list of features to be used for training the model.
+    epochs : int
+        The number of epochs for training the model.
+    batch_size : int
+        The batch size for training the model.
+    model : str
+        The type of model to be trained.
 
-    :return: a tuple containing the trained model and the scaler used for feature scaling.
-    :rtype: tuple
+    Returns
+    -------
+    keras.Model
+        The trained machine learning model.
+    sklearn.preprocessing.StandardScaler
+        The scaler used to normalize the features.
+    float
+        The training loss of the model.
     """
 
 
     df = db.get_user_log_onFeatures(userid, sid, device, features)
-    chosen_model, scaler = create_model(df, epochs, batch_size, model)
-    return chosen_model, scaler
+    chosen_model, scaler, training_loss = create_model(df, epochs, batch_size, model)
+    return chosen_model, scaler, training_loss
 
-    """directory = f'resultsMse_{model}_grims_db'
-    os.makedirs(directory, exist_ok=True)
-    file=f'{directory}/{model}_{features}_{epochs}_{batch_size}_mse' + userid + '_' + str(sid) + '.csv'
-    mses.to_csv(file, index=False)"""
-
-def evaluate_model(chosen_model, scaler, device, features, eval_sid):
+def evaluate_model(chosen_model, scaler, device, features, eval_sid, event_name, model_name):
     """
     Evaluate the chosen model on the given features and evaluation sequence IDs for each user.
-    
-    :param object chosen_model: the machine learning model to be evaluated.
-    :param object scaler: the scaler used to normalize the features.
-    :param str device: the device identifier used for evaluation.
-    :param list features: the list of features to be used for evaluation.
-    :param list eval_sid: the list of evaluation sequence IDs.
-    :return: a DataFrame containing the mean squared error (MSE) for each user and sequence. 
-    :rtype: pd.DataFrame
+
+    Parameters
+    ----------
+    chosen_model : object
+        The machine learning model to be evaluated.
+    scaler : object
+        The scaler used to normalize the features.
+    device : str
+        The device identifier used for evaluation.
+    features : list
+        The list of features to be used for evaluation.
+    eval_sid : list
+        The list of evaluation sequence IDs.
+    event_name : str
+        The name of the event being evaluated.
+    model_name : str
+        The name of the model being evaluated.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A DataFrame containing the mean squared error (MSE) for each user and sequence.
+    str 
+        The file path where the results are saved.
+    str
+        The base name of the file.
     """
     
-    users = db.get_users("metalearning") # grims: TODO implement the activity selection
+    users = db.get_users(event_name) # grims: TODO implement the activity selection
 
     # Valutare l'errore quadratico medio (MSE) per tutte le sequenze
-    schema = {'user': [], 'mse': []}
+    schema = {'sid': [], 'user': [], 'mse': []}
     mses = pd.DataFrame(schema)
     
     for user in users:
@@ -212,20 +397,98 @@ def evaluate_model(chosen_model, scaler, device, features, eval_sid):
             #tm.sleep(1)
             mse = eval(chosen_model, scaler, df)
             print(f'User: {user}, seqID: {seqid}, Mean Squared Error: {mse}')
-            mses.loc[len(mses)] = [user, mse]
+            mses.loc[len(mses)] = [seqid, user, mse]
         print('Next user')
 
-    return mses
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    directory = f'ml_result/metalearning_grims_resultsMse_{model_name}'
+    os.makedirs(directory, exist_ok=True)
+    file=f'{directory}/{model_name}_mse_' + timestamp + '.csv'
+    if os.path.exists(file):
+        mses.to_csv(file, mode='a', header=False, index=False)
+    else:
+        mses.to_csv(file, index=False)
+    basename = f'{model_name}_mse_' + timestamp
+
+    return mses, file, basename 
+
+def meta_eval_models(chosen_model, threshold, userid, scaler, device, features, eval_sid, event_name, model_name): 
+    """
+    Evaluate a machine learning model and generate evaluation metrics and a confusion matrix.
+
+    Parameters
+    ----------
+    chosen_model : object
+        The machine learning model to be evaluated.
+    threshold : float
+        The threshold value for recognizing events.
+    userid : int
+        The user ID for fetching the username.
+    scaler : object
+        The scaler used for normalizing the features.
+    device : str
+        The device used for evaluation.
+    features : list
+        The list of features used in the model.
+    eval_sid : int
+        The session ID for evaluation.
+    event_name : str
+        The name of the event being evaluated.
+    model_name : str
+        The name of the model being evaluated.
+
+    Returns
+    -------
+    dict
+        A dictionary containing the mean squared error (MSE) for each user and sequence.
+    dict
+        A dictionary containing the evaluation results.
+    str
+        The path to the confusion matrix image.
+        
+    Notes
+    -----
+    The function evaluates the specified machine learning model using the given parameters. 
+    It calculates metrics such as mean squared errors (MSE) and generates a confusion matrix. 
+    The results are saved to a file, and the file path is returned.
+    """
+    mses, filename, basename = evaluate_model(chosen_model, scaler, device, features, eval_sid, event_name, model_name)
+
+    df = pd.read_csv(filename)
+    df['Recognised'] = df['mse'].apply(lambda x: 'Yes' if x < threshold else 'No')
+    username = db.get_username(userid)
+    df['auth_user'] = df['user'].apply(lambda x: 'right' if x == username else 'wrong')
+    df.to_csv(filename, index=False)
+
+    if features in ['Pitch', 'Roll', 'Yaw']:
+        sensor = 'Orientation_Sensor'
+    else: 
+        sensor = 'Position_Sensor'
+
+    path = confusion_matrix(df, model_name, sensor, basename, event_name)
+     
+
+    df_dict = df.groupby(df.index).apply(lambda x: x.to_dict(orient='records')).to_dict()
+
+    return mses, df_dict, path
 
 def eval(model, scaler, df): 
     """
-        Evaluate the model on the given dataframe.
+    Evaluate the model on the given dataframe.
 
-        :param keras.Model model: the machine learning model to be evaluated.
-        :param sklearn.preprocessing.StandardScaler scaler: the scaler used to normalize the features.
-        :param pd.DataFrame df: the dataframe to evaluate the model on.
-        :return: the mean squared error (MSE) for the given dataframe.
-        :rtype: float
+    Parameters
+    ----------
+    model : keras.Model
+        The machine learning model to be evaluated.
+    scaler : sklearn.preprocessing.StandardScaler
+        The scaler used to normalize the features.
+    df : pandas.DataFrame
+        The dataframe to evaluate the model on.
+
+    Returns
+    -------
+    float
+        The mean squared error (MSE) for the given dataframe.
     """
     df = df.dropna()
 

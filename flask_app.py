@@ -1,4 +1,5 @@
 import io
+import db_util as db
 import pandas as pd
 import mysql.connector
 # from global_ml import check
@@ -31,8 +32,6 @@ def get_db_connection():
 def index():
     return render_template('index.html')
 
-
-# TODO: validate only on the gyroscope log and accelerometer log 
 @app.route('/validate_logs', methods=['POST'])
 def validate_logs_page():
     
@@ -64,22 +63,26 @@ def validate_logs_page():
     # they relate to activities other than those on which the model was trained 
     general_acc_logs = {'Accelerometer': [k for k, v in acc_dict.items()]}
     general_gyro_logs = {'Gyroscope': [k for k, v in gyro_dict.items()]}
+    logs = session.get('logs', {})
+    none_activity_logs = [k for k, v in acc_dict.items() if v['activity'] == "None"]
 
+    # remove the logs that are used for training and validation
+    # and those that are not related to any activity
     for sensor_key, log_ids in logs.items():
         if sensor_key in general_acc_logs:
-            general_acc_logs[sensor_key] = [log_id for log_id in general_acc_logs[sensor_key] if log_id not in log_ids]
+            general_acc_logs[sensor_key] = [log_id for log_id in general_acc_logs[sensor_key] if (log_id not in log_ids and log_id not in none_activity_logs)]
         if sensor_key in general_gyro_logs:
-            general_gyro_logs[sensor_key] = [log_id for log_id in general_gyro_logs[sensor_key] if log_id not in log_ids]
+            general_gyro_logs[sensor_key] = [log_id for log_id in general_gyro_logs[sensor_key] if (log_id not in log_ids and log_id not in none_activity_logs)]
     
     threshold = session['training_loss']
-    acc_eval_res, acc_conf_matrix = mlw.eval_models("Accelerometer", threshold, acc_logs, general_acc_logs, session['chosen_model'], session['model_name'], session['scaler'])
-    gyro_eval_res, gyro_conf_matrix = mlw.eval_models("Gyroscope", threshold, gyro_logs, general_gyro_logs, session['chosen_model'], session['model_name'], session['scaler'])
+    event_name = session['event_name']
+    acc_eval_res, acc_conf_matrix = mlw.eval_models("Accelerometer", threshold, acc_logs, general_acc_logs, session['chosen_model'], session['model_name'], session['scaler'], session['event_name'])
+    gyro_eval_res, gyro_conf_matrix = mlw.eval_models("Gyroscope", threshold, gyro_logs, general_gyro_logs, session['chosen_model'], session['model_name'], session['scaler'], session['event_name'])
 
     session['acc_conf_matrix'] = acc_conf_matrix
     session['gyro_conf_matrix'] = gyro_conf_matrix 
 
-    
-    return render_template('train_and_validation.html', train_sensor = session['sensor'], acc_dict = acc_dict, gyro_dict = gyro_dict, acc_eval_result = acc_eval_res, gyro_eval_result = gyro_eval_res, acc_conf_mat = session['acc_conf_matrix'], gyro_conf_mat = session['gyro_conf_matrix'], show_eval = True, show_pca_plts = False, show_plts=False)#show_pca_plts = session['show_pca_plts'])
+    return render_template('train_and_validation.html', train_sensor = session['sensor'], acc_dict = acc_dict, gyro_dict = gyro_dict, acc_eval_result = acc_eval_res, gyro_eval_result = gyro_eval_res, acc_conf_mat = session['acc_conf_matrix'], gyro_conf_mat = session['gyro_conf_matrix'], show_eval = True)
 
 @app.route('/process_logs', methods=['POST'])
 def process_logs(): 
@@ -103,7 +106,6 @@ def process_logs():
     session['scaler'] = scaler
     session['test_log'] = test_log
     session['train_log'] = train_log
-    #print("\nprocess_logs() - train_log", train_log)
     session['sensor'] = sensor
     session['training_loss'] = training_loss    
 
@@ -125,14 +127,10 @@ def process_activity():
 
     session['logs'] = logs
 
-    # TODO: use this logs for machine learning
-    # you can choose to show only these logs that were selected based on the activity 
-    # instead of all the logs coming from the kmeans 
-
-    if session['show_pca_plts'] == True: 
-        return render_template('train_and_validation.html', selected_activity = selected_activity, logs = logs, results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movment = session['user_movement'], acc_pca = session['acc_dict'], gyro_pca = session['gyro_dict'], plt_acc_pca = session['acc_plt'], plt_gyro_pca = session['gyro_plt'], show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
-    elif session['show_normal_plts'] == True: 
-        return render_template('train_and_validation.html', selected_activity = selected_activity, logs = logs, results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movment = session['user_movement'], acc_dict = session['acc_dict'], gyro_dict = session['gyro_dict'], plt_acc = session['acc_plt'], plt_gyro = session['gyro_plt'], show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
+    if 'acc_pca_plt' in session and 'gyro_pca_plt' in session:  
+        return render_template('train_and_validation.html', selected_activity = selected_activity, logs = logs, results= session['result_users'], activities = session['activities'], user_movement = session['user_movement'], acc_pca = session['acc_dict'], gyro_pca = session['gyro_dict'], plt_acc_pca = session['acc_pca_plt'], plt_gyro_pca = session['gyro_pca_plt'])
+    elif 'acc_plt' in session and 'gyro_plt' in session: 
+        return render_template('train_and_validation.html', selected_activity = selected_activity, logs = logs, results= session['result_users'], activities = session['activities'], user_movement = session['user_movement'], acc_dict = session['acc_dict'], gyro_dict = session['gyro_dict'], plt_acc = session['acc_plt'], plt_gyro = session['gyro_plt'])
 
 @app.route('/variance', methods=['POST'])
 def variance_page():
@@ -190,12 +188,10 @@ def variance_page():
 
     session['acc_dict'] = acc_dict
     session['gyro_dict'] = gyro_dict
-    session['show_pca_plts'] = False
-    session['show_normal_plts'] = True
     session['acc_plt'] = plt_acc
     session['gyro_plt'] = plt_gyro
 
-    return render_template('train_and_validation.html', results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movement = session['user_movement'], acc_dict = acc_dict, gyro_dict = gyro_dict, plt_acc = plt_acc, plt_gyro = plt_gyro, show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
+    return render_template('train_and_validation.html', results= session['result_users'], activities = session['activities'], user_movement = session['user_movement'], acc_dict = acc_dict, gyro_dict = gyro_dict, plt_acc = plt_acc, plt_gyro = plt_gyro)
 
 @app.route('/variance_pca', methods = ['POST'])
 def variance_pca_page(): 
@@ -253,54 +249,37 @@ def variance_pca_page():
 
     session['acc_dict'] = acc_dict
     session['gyro_dict'] = gyro_dict
-    session['show_pca_plts'] = True
-    session['show_normal_plts'] = False
-    session['acc_plt'] = plt_acc_pca
-    session['gyro_plt'] = plt_gyro_pca
- 
-    return render_template('train_and_validation.html', results= session['result_users'], activities = session['activities'], events = session['events'], devices = session['devices'], user_movment = session['user_movement'], acc_pca = acc_dict, gyro_pca = gyro_dict, plt_acc_pca = plt_acc_pca, plt_gyro_pca = plt_gyro_pca, show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
+    session['acc_pca_plt'] = plt_acc_pca
+    session['gyro_pca_plt'] = plt_gyro_pca
 
-@app.route('/train_and_validation')
+    return render_template('train_and_validation.html', results = session['result_users'], activities = session['activities'], events = session['event_name'], user_movement = session['user_movement'], acc_pca = acc_dict, gyro_pca = gyro_dict, plt_acc_pca = plt_acc_pca, plt_gyro_pca = plt_gyro_pca)
+
+@app.route('/train_and_validation', methods = ['POST'])
 def train_and_validation_page():
-    connection = get_db_connection()
-    cursor = connection.cursor(dictionary=True)
+    session.clear()
+    event_name = request.form['button']
+    session['event_name'] = event_name 
+    
+    event_id = db.get_eventID_by_event_name(event_name)
+    session['event_id'] = event_id
 
-    cursor.execute("SELECT ID FROM user where Name is NULL")  
-    results = cursor.fetchall() 
+    results = db.get_userIDs_by_eventID(event_id)
     session['result_users'] = results
+    print(results)
 
-    cursor.execute("select distinct event_name from event where ID_event = 1")
-    events = cursor.fetchall()
-    session['events'] = events 
+    user_movement_list = db.get_userIDs_and_movementID_by_eventID(event_id)
+    session['user_movement'] = user_movement_list
 
-    cursor.execute(f"select activity_name from activity where ID_activity in (select a.ID_activity from association as a join event as e on a.ID_event and a.ID_event = 1)")
-    activities = cursor.fetchall()
+    activities = db.get_activityName_by_eventID(event_id)
     session['activities'] = activities
 
-    cursor.execute("select distinct type from device as d where d.ID_activity in (select distinct a.ID_activity from association as a join event as e on a.ID_event and a.ID_event = 1)")
-    devices = cursor.fetchall()
-    session['devices'] = devices
-    
-    sql = "select ID_user, ID_movement from movement where ID_user in (select ID from user where Name is NULL)"
-    cursor.execute(sql)
-    user_movement_list = cursor.fetchall()  
-    # Convert list to dictionary
-    user_movement = {}
-    for row in user_movement_list:
-        user_id = row['ID_user']
-        movement_id = row['ID_movement']
-        if user_id not in user_movement:
-            user_movement[user_id] = []
-        user_movement[user_id].append(movement_id)
-    session['user_movement'] = user_movement
-     
-    cursor.close()
-    connection.close()
+    if event_name == "UPSIDE":
+        return render_template('train_and_validation.html', activities = ['activities'], event_name = session['event_name'], results= session['result_users'], user_movement = session['user_movement'])
+    else: 
+        devices = db.get_devices_by_eventID(event_id)
+        session['devices'] = devices
 
-    session['show_pca_plts'] = False
-    session['show_normal_plts'] = False
-    return render_template('train_and_validation.html', results= session['result_users'], activities = session['activities'], devices = session['devices'], events = session['events'], user_movement = session['user_movement'], show_plts = session['show_normal_plts'], show_pca_plts = session['show_pca_plts'])
-
+        return render_template('train_and_validation_meta.html', event_name = session['event_name'], results = session['result_users'], activities = session['activities'], devices = session['devices'], user_movement = session['user_movement'])
 
 @app.route('/run_train', methods=['POST'])
 def run_train():
@@ -312,17 +291,20 @@ def run_train():
     epochs = int(parameters.get('epochs'))
     batch_size = int(parameters.get('batch_size'))
     model = parameters.get('model')
+    session['model_name'] = model
 
-    model, scaler = mlw.model_train(userid, sid, device, features, epochs, batch_size, model)
+    model, scaler, training_loss = mlw.model_train(userid, sid, device, features, epochs, batch_size, model)
+    session['user_id'] = userid
     session['model'] = model
     session['scaler'] = scaler
     session['device'] = device
     session['features'] = features
+    session['training_loss'] = training_loss
 
     result = session.get('result_users', [])
     device = session.get('devices', [])
     event = session.get('events', [])
-    return render_template('train_and_validation.html', results = result, devices = device, events = event)
+    return render_template('train_and_validation_meta.html', results = result, devices = device, events = event, user_movement = session['user_movement'])
 
 @app.route('/validate_mse', methods=['POST'])
 def validate():
@@ -332,29 +314,30 @@ def validate():
     scaler = session.get('scaler')
     device = session.get('device')
     features = session.get('features', [])
-    print(eval_sid, device, features)
-    mses = mlw.evaluate_model(model, scaler, device, features, eval_sid)
-    session['result_list'] = mses
-    result_list = session.get('result_list', {})
-    result_list = result_list.groupby('user')['mse'].apply(list).to_dict()
+    model_name = session.get('model_name')
+    threshold = session.get('training_loss')
+    userid = session.get('user_id')
+
+    mses, df_dict, path = mlw.meta_eval_models(model, threshold, userid, scaler, device, features, eval_sid, session['event_name'], model_name)
 
     result = session.get('result_users', [])
     device = session.get('devices', [])
-    event = session.get('events', [])
 
-    if isinstance(result_list, pd.DataFrame) and not result_list.empty:
-        return render_template('train_and_validation.html', result_list=result_list, results=result, devices=device, events=event)
-    elif result_list:
-        return render_template('train_and_validation.html', result_list=result_list, results=result, devices=device, events=event)
+    if features in ['Pitch', 'Roll', 'Yaw']:
+        sensor = 'Orientation'
+    else: 
+        sensor = 'Position'
+
+    if isinstance(mses, pd.DataFrame) and not mses.empty:
+        return render_template('train_and_validation_meta.html', train_sensor = sensor, eval_result = df_dict, meta_conf_mat = path, activities = session['activities'], results=result, user_movement = session['user_movement'], devices=device, events=session['event_name'])
+    elif mses:
+        return render_template('train_and_validation_meta.html', train_sensor = sensor, eval_result = df_dict, meta_conf_mat = path, activities = session['activities'], results=result, user_movement = session['user_movement'], devices=device, events=session['event_name'])
     else:
-        return render_template('train_and_validation.html', result_list={}, results=result, devices=device, events=event)
-
-
+        return render_template('train_and_validation_meta.html', results=result, user_movement = session['user_movement'], devices=device, activities = session['activities'], events=session['event_name'])
 
 @app.route('/check')
 def check_page():
     return render_template('check.html')
-
 
 @app.route('/check', methods=['POST'])
 def run_check():
@@ -376,6 +359,7 @@ def run_experiments_page():
 
 
 @app.route('/run_experiments', methods=['POST'])
+
 def run_experiments():
     parameters = request.form
     parameter = parameters.get('parameter')

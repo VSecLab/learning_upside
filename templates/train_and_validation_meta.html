@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Train and Validation</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <div class = "container mt-5">
+        <h1 class="custom-header-h1">Train and Validation</h1>
+        <div class="card shadow-lg">
+            <div class="card-body">
+                <form action="/run_train" method="post">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="userid" class="font-weight-bold fs-5">User ID</label>
+                            <select class="form-control" id="userid" name="userid" required>
+                                {% for row in results %}
+                                <option> {{ row }} </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="sid" class="font-weight-bold fs-5">Training Sequence ID</label>
+                            <select class="form-control" id="sid" name="sid" required>
+                                {% for i in range(1,21) %}
+                                <option> {{ i }} </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <label for="activity" class="font-weight-bold fs-5">Activity</label>
+                            <select class="form-control" id="activity" name="activity" required>
+                                <option value="" selected> Select an activity </option>
+                                {% for row in activities %}
+                                <option value= "{{ row }}"> {{ row }} </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="device" class="font-weight-bold fs-5">Device</label>
+                            <select class="form-control" id="device" name="device" onchange="updateFeatureOptions()" required>
+                                <option value="" selected> Select a device </option>
+                                {% for device in devices %}
+                                <option value= "{{ device }}"> {{ device }} </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="feature" class="font-weight-bold fs-5">Feature</label>
+                            <select class="form-control" id="feature" name="feature" required> </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <label for="epochs" class="font-weight-bold fs-5">Epochs</label>
+                            <input type="text" class="form-control" id="epochs" name="epochs" value="10" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="batch_size" class="font-weight-bold fs-5">Batch Size</label>
+                            <input type="text" class="form-control" id="batch_size" name="batch_size" value="16" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="model" class="font-weight-bold fs-5">Model</label>
+                            <select class="form-control" id="model" name="model" required>
+                                <option value="RNN">RNN</option>
+                                <option value="RNN3label">RNN3label</option>
+                                <option value="LSTMauto">LSTMauto</option>
+                                <option value="LSTMlabel">LSTMlabel</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-4">
+                        <div class="col-md-12 text-center">
+                            <button type="submit" onclick="submitForm('/run_train');" class="btn btn-primary btn-lg">Train</button>
+                        </div>
+                    </div>
+                </form>
+            </div> 
+        </div>
+    </div>
+
+    <div class = "container mt-5">
+        <h1 class="custom-header-h1">Validation</h1>
+        <div class="card shadow-lg">
+            <div class="card-body">
+                <div class="row mb-4">
+                    <h5 class="custom-header-h5 text-center">Train on {{ train_sensor }} sensor(s)</h5> 
+                 </div>
+                <form action="/validate_mse" method="POST">
+                    <div class="row mb-12">
+                        <div class="col-md-12">
+                            <label for="eval_sid" class="font-weight-bold fs-5">Evaluation Sequence ID</label>
+                            <input type="text" class="form-control" id="eval_sid" name="eval_sid" pattern="^(\d+)(,\d+)*$" value="2,3,4,5,6" title="Enter only numbers separated by commas, e.g., 1,2,3" required>
+                        </div>
+                    </div>
+                    <div class="row mt-4">
+                        <div class="col-md-12 text-center">
+                            <button type="submit" class="btn btn-primary btn-lg">Validate</button>
+                        </div>
+                    </div>
+                </form>
+
+                {% if meta_conf_mat %}
+                <div class="container mt-5">
+                    <div class="row mb-4">
+                        <div class="col-md-12 mb-4">
+                            <div class="card shadow-lg">
+                                <div class="card-body">
+                                    <h5 class="custom-header-h5 text-center">Confusion Matrix</h5>
+                                    <div class="text-center">
+                                        <img src="{{ url_for('static', filename = 'images/' + meta_conf_mat) }}" alt="Confusion Matrix" class="responsive-img">
+                                    </div>
+                                </div>
+                            </div>
+                        </div> 
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if eval_result %}
+                <div class="row mb-4">
+                    <div class="table-responsive">
+                        <h3 class="text-center">Evaluation Results</h3>
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th scope="col" style="border-left: 1px solid #dee2e6;">seqID</th>
+                                    <th scope="col" style="border-left: 1px solid #dee2e6;">Username</th>
+                                    <th scope="col" style="border-left: 1px solid #dee2e6;">MSE</th>
+                                    <th scope="col" style="border-left: 1px solid #dee2e6;">Auth_User</th>
+                                    <th scope="col" style="border-left: 1px solid #dee2e6;">Recognised</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for i, records in eval_result.items() %}
+                                    {% for record in records %}
+                                        <tr>
+                                            <td style="border-left: 1px solid #dee2e6;">{{ record.sid }}</td>
+                                            <td style="border-left: 1px solid #dee2e6;">{{ record.user }}</td>
+                                            <td style="border-left: 1px solid #dee2e6;">{{ record.mse }}</td>
+                                            <td style="border-left: 1px solid #dee2e6;">{{ record.auth_user }}</td>
+                                            <td style="border-left: 1px solid #dee2e6;">{{ record.Recognised }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class = "container mt-5">
+        <h1 class="custom-header-h1">User Logs</h1>
+        <div class="card shadow-lg">
+            <div class="card-body">
+                {% if user_movement %}
+                <div class="container mt-4">
+                    <div class="row">
+                        <!-- Iterate over the result_list dictionary -->
+                        {% for ID_user, ID_movement in user_movement.items() %}
+                            <div class="col-md-4 mb-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">User ID: {{ ID_user }}</h5>
+                                        <p class="card-text">User Logs:</p>
+                                        <ul class="list-group list-group-flush">
+                                            {% for mov in ID_movement %}
+                                                <li class="list-group-item">{{ mov }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Script per Bootstrap -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+</body>
+</html> 
