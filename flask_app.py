@@ -335,31 +335,11 @@ def validate():
     else:
         return render_template('train_and_validation_meta.html', results=result, user_movement = session['user_movement'], devices=device, activities = session['activities'], events=session['event_name'])
 
-@app.route('/check')
-def check_page():
-    return render_template('check.html')
-
-@app.route('/check', methods=['POST'])
-def run_check():
-    parameters = request.form  # Se i dati sono inviati tramite il form
-    userid = int(parameters.get('userid'))
-    sid = int(parameters.get('sid'))
-    parameter = parameters.get('parameter')
-    threshold = float(parameters.get('threshold'))
-    epochs = int(parameters.get('epochs'))
-    batch_size = int(parameters.get('batch_size'))
-    model = parameters.get('model')
-    # Esegui il metodo check dallo script globale
-    check(userid, sid, parameter, threshold, epochs, batch_size, model)
-    return 'Check completed successfully'
-
 @app.route('/run_experiments')
 def run_experiments_page():
     return render_template('run_experiments.html')
 
-
 @app.route('/run_experiments', methods=['POST'])
-
 def run_experiments():
     parameters = request.form
     parameter = parameters.get('parameter')

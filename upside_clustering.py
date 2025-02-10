@@ -16,14 +16,13 @@ def plot_pca_iterative_kmeans(df1, df0, sensor, iteration):
     df0 = df0.astype(float)
     # Plotting in 3D
     fig = plt.figure()
-    ax = fig.add_subplot(111)
 
     plt.scatter(df1[:, 0], df1[:, 1],  c='r', marker='o', label='Cluster 1')
     plt.scatter(df0[:, 0], df0[:, 1],  c='b', marker='^', label='Cluster 0')
 
-    ax.set_xlabel('X Label')
-    ax.set_ylabel('Y Label')
-    ax.legend()
+    plt.xlabel("X axis")
+    plt.ylabel("Y axis")
+    plt.legend()
 
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     plot_filename = f'PCA_{sensor}_{iteration}_kmeans_plot_{timestamp}.png'
@@ -35,7 +34,7 @@ def plot_pca_iterative_kmeans(df1, df0, sensor, iteration):
 
     return plot_filename
 
-def plot_iterative_kmeans(df1, df0, sensor):
+def plot_iterative_kmeans(df1, df0, sensor, iteration):
     df1 = df1.astype(float)
     df0 = df0.astype(float)
     # Plotting in 3D
@@ -52,7 +51,7 @@ def plot_iterative_kmeans(df1, df0, sensor):
     ax.legend()
 
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    plot_filename = f'{sensor}_kmeans_plot_{timestamp}.png'
+    plot_filename = f'{sensor}_{iteration}_kmeans_plot_{timestamp}.png'
     plot_dir = "static/images/kmeans_plt/"
     if not os.path.exists(plot_dir):
         os.makedirs(plot_dir)
@@ -167,7 +166,7 @@ def PCA_kmeans(df, sensor, num_iterations):
         reduced_df = pd.DataFrame(data=reduced, columns=["component1", "component2"])
         red = reduced_df[["component1", "component2"]].to_numpy()
 
-        kmeans = KMeans(n_clusters=2)
+        kmeans = KMeans(n_clusters=2, random_state=100)
         kfit = kmeans.fit(red)
         res = kmeans.predict(red)
 
@@ -199,6 +198,7 @@ def PCA_kmeans(df, sensor, num_iterations):
 
         new_df_1 = new_df[new_df["motion"] == 1]
         plt_df_1 = plt_df[plt_df["motion"] == 1]
+        
         # Concatenate the new motion dataframes
         all_new_df_1 = pd.concat([all_new_df_1, plt_df_1], ignore_index=True) 
         n_new_df_1 = pd.concat([n_new_df_1, new_df_1], ignore_index=True)
@@ -234,7 +234,7 @@ def ml_kmeans(df, sensor, num_iterations):
         print(i)
         dataset = df[["varianceX", "varianceY", "varianceZ"]].to_numpy()
         #print(dataset)
-        kmeans = KMeans(n_clusters=2)
+        kmeans = KMeans(n_clusters=2, random_state=100)
         kfit = kmeans.fit(dataset)
         res = kmeans.predict(dataset)
 
@@ -272,7 +272,7 @@ def ml_kmeans(df, sensor, num_iterations):
     df1 = all_new_df_1[["varianceX", "varianceY", "varianceZ"]].to_numpy()
     df0 = new_df_0[["varianceX", "varianceY", "varianceZ"]].to_numpy()
 
-    plot = plot_iterative_kmeans(df1, df0, sensor)
+    plot = plot_iterative_kmeans(df1, df0, sensor, i + 1)
 
     #print(new_df_1)
     #print(new_df_0)

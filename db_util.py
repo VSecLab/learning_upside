@@ -54,17 +54,24 @@ def get_df_from_logID(logIDs):
     dict
         Dictionary of DataFrames for the given logIDs and sensor.
     """
+    
     mydb, mycursor = db_connect()
 
     logs_dict = {}
-    #keys = list[logIDs.keys()]
     for sensor, id_logs in logIDs.items():
         for id_log in id_logs:
-            sql = f"select X, Y, Z from {sensor.lower()} where ID_log = \"{id_log}\""
+            # sql = f"select {parameters[0]}, {parameters[1]}, {parameters[2]} from {sensor.lower()} where ID_log = \"{id_log}\""
+            sql = f"SELECT timestamp, parameter, value FROM measurement WHERE ID_log = \"{id_log}\" order by timestamp;"
+
             try:
                 mycursor.execute(sql)
-                values = mycursor.fetchall()
-                logs_dict[id_log] = pd.DataFrame(values, columns=["X", "Y", "Z"])
+                # values = mycursor.fetchall()
+                data = mycursor.fetchall()
+                df = pd.DataFrame(data, columns=['timestamp', 'parameter', 'value'])
+                df_pivot = df.pivot_table(index='timestamp', columns='parameter', values='value')
+
+                #logs_dict[id_log] = pd.DataFrame(values, columns=["X", "Y", "Z"])
+                logs_dict[id_log] = df_pivot
                 mydb.commit()
             except mysql.connector.Error as err:
                 print(f"Error - logs: {err}")

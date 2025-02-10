@@ -48,25 +48,25 @@ def get_tp_fp_fn_tn(df, event_name):
         raise ValueError("The input DataFrame is empty.")
     TP, FP, FN, TN = 0, 0, 0, 0
     for index, row in df.iterrows():
-        if row['Recognised'] == 'Yes':
+        if row['Recognised'] == 'Positive':
             if event_name == "UPSIDE":
-                if row['activity'] == 'right':
+                if row['activity'] == 'Positive':
                     TP += 1
                 else:
                     FP += 1
             elif event_name == "metalearning":
-                if row['auth_user'] == 'right':
+                if row['auth_user'] == 'Positive':
                     TP += 1
                 else:
                     FP += 1
         elif row['Recognised'] == 'No':
             if event_name == "UPSIDE":
-                if row['activity'] == 'right':
+                if row['activity'] == 'Positive':
                     FN += 1
                 else:
                     TN += 1
             elif event_name == "metalearning":
-                if row['auth_user'] == 'right':
+                if row['auth_user'] == 'Positive':
                     FN += 1
                 else:
                     TN += 1
@@ -160,10 +160,10 @@ def evalutate_model_on_activity(right_test_logs, wrong_test_logs, chosen_model, 
 
     wrong_logs = db.get_df_from_logID(wrong_test_logs)
 
-    right_schema = {'log_id': [], 'mse': [], 'activity': 'right'}
+    right_schema = {'log_id': [], 'mse': [], 'activity': 'Positive'}
     right_mses = pd.DataFrame(right_schema)
 
-    wrong_schema = {'log_id': [], 'mse': [], 'activity': 'wrong'}
+    wrong_schema = {'log_id': [], 'mse': [], 'activity': 'Negative'}
     wrong_mses = pd.DataFrame(wrong_schema)
 
     print('Right logs evaluation')
@@ -172,7 +172,7 @@ def evalutate_model_on_activity(right_test_logs, wrong_test_logs, chosen_model, 
         df = right_logs[log]
         mse = eval(chosen_model, scaler, df)
         print(f'Mean Squared Error: {mse}')
-        right_mses.loc[len(right_mses)] = [log, mse, 'right']
+        right_mses.loc[len(right_mses)] = [log, mse, 'Positive']
         
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     directory = f'ml_result/grims_resultsMse_{model_name}'
@@ -186,7 +186,7 @@ def evalutate_model_on_activity(right_test_logs, wrong_test_logs, chosen_model, 
         df = wrong_logs[log]
         mse = eval(chosen_model, scaler, df)
         print(f'Mean Squared Error: {mse}')
-        wrong_mses.loc[len(wrong_mses)] = [log, mse, 'wrong']
+        wrong_mses.loc[len(wrong_mses)] = [log, mse, 'Negative']
     
     directory = f'ml_result/grims_resultsMse_{model_name}'
     os.makedirs(directory, exist_ok=True)
@@ -235,7 +235,7 @@ def eval_models(sensor, threshold, right_test_logs, wrong_test_logs, chosen_mode
 
     # Open the filename as a CSV file with pandas
     df = pd.read_csv(filename)
-    df['Recognised'] = df['mse'].apply(lambda x: 'Yes' if x < threshold else 'No')
+    df['Recognised'] = df['mse'].apply(lambda x: 'Positive' if x < threshold else 'Negative')
     df.to_csv(filename, index=False)
 
     # Save the results in a dictionary
@@ -280,7 +280,7 @@ def model_train_activity(logs, epochs, batch_size, percentage, model):
     list
         List of log identifiers used for training.
     """
-    
+
     logs_dict = db.get_df_from_logID(logs)
 
     #print(logs_dict)
@@ -290,6 +290,7 @@ def model_train_activity(logs, epochs, batch_size, percentage, model):
     x = (num_dataframes * percentage) // 100
     if x == 0:
         x = 1
+
     # randomize the order of the dictionary
     keys = list(logs_dict.keys())
     random.shuffle(keys)
