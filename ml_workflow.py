@@ -59,7 +59,7 @@ def get_tp_fp_fn_tn(df, event_name):
                     TP += 1
                 else:
                     FP += 1
-        elif row['Recognised'] == 'No':
+        elif row['Recognised'] == 'Negative':
             if event_name == "UPSIDE":
                 if row['activity'] == 'Positive':
                     FN += 1
@@ -250,14 +250,49 @@ def eval_models(sensor, threshold, right_test_logs, wrong_test_logs, chosen_mode
     conf_matrix = confusion_matrix(df, model_name, sensor, basename, event_name)
     return eval_results, conf_matrix
 
+def model_train_lab_activity(lab_logs, activity_name, epochs, batch_size, model): 
+    """
+    Train a machine learning model on laboratory data.
+
+    Parameters
+    ----------
+    logs : dict
+        Dictionary with the sensor as key and the list of logIDs as value.
+    activity_name : str
+        The activity name to be used for training the model.
+    epochs : int
+        Number of epochs to train the model.
+    batch_size : int
+        Size of the batches used in training.
+    model : str
+        The type of model to be created and trained.
+
+    Returns
+    -------
+    keras.Model
+        The trained machine learning model.
+    sklearn.preprocessing.StandardScaler
+        The scaler used to normalize the features.
+    float
+        The training loss of the model.
+    list
+        List of log identifiers used for testing.
+    list
+        List of log identifiers used for training.
+    """
+
+    chosen_model, scaler, training_loss, test_log_keys, train_log_keys = model_train_activity(lab_logs, epochs, batch_size, 100, model)
+
+    return chosen_model, scaler, training_loss, test_log_keys, train_log_keys
+
 def model_train_activity(logs, epochs, batch_size, percentage, model):
     """
     Trains a machine learning model using a specified percentage of log data for training.
 
     Parameters
     ----------
-    logs : list
-        List of log identifiers to retrieve data from the database.
+    logs : dict
+        Dictionary with the sensor as key and the list of logIDs as value.
     epochs : int
         Number of epochs to train the model.
     batch_size : int
@@ -509,6 +544,3 @@ def eval(model, scaler, df):
         mse = np.mean(np.power(df_scaled - predictions_scaled[:, :, np.newaxis], 2))
 
     return mse
-
-if __name__ == "__main__":
-    model_train(82, 1, "visore", "Pitch", 3, 2, "RNN")

@@ -27,6 +27,14 @@ function updateFeatureOptions() {
     }
 }
 
+
+function setPercentageTo100() {
+    var percentageInput = document.getElementById('percentage');
+    percentageInput.value = 100;
+    percentageInput.readOnly = true;
+}
+
+
 // esegui la funzione quando la pagina viene caricata per la prima volta
 window.onload = function() {
     updateFeatureOptions();

@@ -290,8 +290,8 @@ def get_eventID_by_event_name(event_name):
 
     Returns
     -------
-    list
-        List of event IDs for the given event name.
+    int
+        ID of the event.
     """
 
     mydb, mycursor = db_connect()
@@ -369,6 +369,43 @@ def get_userIDs_and_movementID_by_eventID(event_id):
         if user_id not in user_movement:
             user_movement[user_id] = []
         user_movement[user_id].append(movement_id)
+
+    return user_movement
+
+def get_sensor_movementID_on_eventID_activity(event_id, activity_name): 
+    """
+    Get the list of userIDs and movementIDs for the given eventID.
+
+    Parameters
+    ----------
+    event_id : int
+        ID of the event.
+    activity_name : str
+        Name of the activity.
+
+    Returns
+    -------
+    dict
+        Dictionary with sensor as keys and lists of movementIDs as values.
+    """
+
+    mydb, mycursor = db_connect()
+    sql = f"select sensor, ID_movement from movement where ID_user in (select ID_user from participation where ID_event = {event_id}) and ID_activity = (select ID_activity from activity where activity_name = \"{activity_name}\")"
+
+    try: 
+        mycursor.execute(sql)
+        user_movement_list = mycursor.fetchall()
+        mydb.commit()
+    except mysql.connector.Error as err:
+        print(f"Error - ID: {err}")
+    db_disconnect(mydb, mycursor)
+
+    # Convert list to dictionary
+    user_movement = {}
+    for sensor, movement_id in user_movement_list:
+        if sensor not in user_movement:
+            user_movement[sensor] = []
+        user_movement[sensor].append(movement_id)
 
     return user_movement
 
@@ -457,6 +494,62 @@ def get_username(userid):
     db_disconnect(mydb, mycursor)
 
     return name[0]
+
+def get_eventIDs(): 
+    """
+    Get the list of event IDs.
+
+    Returns
+    -------
+    list
+        List of event IDs.
+    """
+
+    mydb, mycursor = db_connect()
+
+    sql = f"select ID_event from event"
+    
+    try: 
+        mycursor.execute(sql)
+        ids = mycursor.fetchall()
+        mydb.commit()
+    except mysql.connector.Error as err:
+        print(f"Error - ID: {err}")
+    db_disconnect(mydb, mycursor)
+
+    ids = [row[0] for row in ids]
+
+    return ids
+
+def get_eventName(event_id):
+    """
+    Get the name for the given event ID.
+
+    Parameters
+    ----------
+    event_id : int
+        ID of the event.
+
+    Returns
+    -------
+    str
+        Name corresponding to the given event ID.
+    """
+
+    mydb, mycursor = db_connect()
+
+    sql = f"select event_name from event where ID_event = {event_id}"
+    
+    try: 
+        mycursor.execute(sql)
+        name = mycursor.fetchone()
+        mydb.commit()
+    except mysql.connector.Error as err:
+        print(f"Error - ID: {err}")
+    db_disconnect(mydb, mycursor)
+
+    return name[0]
+
 
 if __name__ == "__main__":
     #get_user_seqIDs("AlessandroMercurio", "metalearning")

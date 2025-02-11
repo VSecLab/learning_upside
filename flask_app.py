@@ -87,20 +87,38 @@ def validate_logs_page():
 @app.route('/process_logs', methods=['POST'])
 def process_logs(): 
     parameters = request.form
+    event_name = parameters.get('event_name')
     epochs = int(parameters.get('epochs'))
     batch_size = int(parameters.get('batch_size'))
     percentage = int(parameters.get('percentage'))
     sensor = parameters.get('sensor')
     model = parameters.get('model')
 
+    eventID = db.get_eventID_by_event_name(event_name)
+    activity_name = session.get('selected_activity', None)
+
     logs = session.get('logs', {})
-    
     if sensor != 'Both':
         sub_logs = {sensor: logs.get(sensor, [])}
     else: 
         sub_logs = logs
 
-    chosen_model, scaler, training_loss, test_log, train_log = mlw.model_train_activity(sub_logs, epochs, batch_size, percentage, model)
+
+    if eventID != 3: 
+        chosen_model, scaler, training_loss, test_log, train_log = mlw.model_train_activity(sub_logs, epochs, batch_size, percentage, model)
+    elif eventID == 3: 
+        print("Train on lab event")
+        lab_logs = db.get_sensor_movementID_on_eventID_activity(3, activity_name)
+        if sensor != 'Both':
+            sub_lablogs = {sensor: lab_logs.get(sensor.lower(), [])}
+        else: 
+            sub_lablogs = lab_logs
+        chosen_model, scaler, training_loss, test_log, train_log = mlw.model_train_lab_activity(sub_lablogs, activity_name, epochs, batch_size, model)
+        test_log = {k: sub_logs[k] for k in list(sub_logs)}
+        test_log_keys = list(test_log.keys())
+        print("\nprocess_logs() - test_log") 
+        print(test_log)
+
     session['model_name'] = model
     session['chosen_model'] = chosen_model
     session['scaler'] = scaler
@@ -127,10 +145,17 @@ def process_activity():
 
     session['logs'] = logs
 
+    eventIds = db.get_eventIDs() 
+    names = []
+    for id in eventIds:
+        event_name = db.get_eventName(id)
+        names.append(event_name)
+    
+
     if 'acc_pca_plt' in session and 'gyro_pca_plt' in session:  
-        return render_template('train_and_validation.html', selected_activity = selected_activity, logs = logs, results= session['result_users'], activities = session['activities'], user_movement = session['user_movement'], acc_pca = session['acc_dict'], gyro_pca = session['gyro_dict'], plt_acc_pca = session['acc_pca_plt'], plt_gyro_pca = session['gyro_pca_plt'])
+        return render_template('train_and_validation.html', eventNames = names, selected_activity = selected_activity, logs = logs, results= session['result_users'], activities = session['activities'], user_movement = session['user_movement'], acc_pca = session['acc_dict'], gyro_pca = session['gyro_dict'], plt_acc_pca = session['acc_pca_plt'], plt_gyro_pca = session['gyro_pca_plt'])
     elif 'acc_plt' in session and 'gyro_plt' in session: 
-        return render_template('train_and_validation.html', selected_activity = selected_activity, logs = logs, results= session['result_users'], activities = session['activities'], user_movement = session['user_movement'], acc_dict = session['acc_dict'], gyro_dict = session['gyro_dict'], plt_acc = session['acc_plt'], plt_gyro = session['gyro_plt'])
+        return render_template('train_and_validation.html', eventNames = names, selected_activity = selected_activity, logs = logs, results= session['result_users'], activities = session['activities'], user_movement = session['user_movement'], acc_dict = session['acc_dict'], gyro_dict = session['gyro_dict'], plt_acc = session['acc_plt'], plt_gyro = session['gyro_plt'])
 
 @app.route('/variance', methods=['POST'])
 def variance_page():
