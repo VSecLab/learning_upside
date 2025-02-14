@@ -8,6 +8,7 @@ import db_util as db
 import seaborn as sns
 import VisorData as vd
 import matplotlib.pyplot as plt
+from  sklearn.metrics import mean_squared_error
 
 from datetime import datetime
 from models import create_model
@@ -530,17 +531,45 @@ def eval(model, scaler, df):
 
     # data normalization
     df_scaled = scaler.transform(df)
-
+    timesteps = 100
     # reshape the data for the model input 
-    df_scaled = df_scaled.reshape((df_scaled.shape[0], df_scaled.shape[1], 1))
+    # df_scaled = df_scaled.reshape((df_scaled.shape[0], df_scaled.shape[1], 1))
+    x_train, y_train = create_sequence(df_scaled, timesteps)
+    #predictions_scaled = model.predict(df_scaled)
+    #test_x = x_train[0].reshape((1, x_train.shape[1], x_train.shape[2]))
+    predictions_scaled = model.predict(x_train)
 
-    predictions_scaled = model.predict(df_scaled)
+    """print("eval() - predictions_scaled:")
+    print(predictions_scaled)
+    print("eval() - y_train[0]", y_train[0])"""
 
+    """
     # Check if shapes match before computing MSE
     if df_scaled.shape == predictions_scaled.shape:
         # compute the mean squared error 
-        mse = np.mean(np.power(df_scaled - predictions_scaled, 2))
+        mse = np.mean(np.power(x_train - predictions_scaled, 2))
     else:
-        mse = np.mean(np.power(df_scaled - predictions_scaled[:, :, np.newaxis], 2))
-
+        mse = np.mean(np.power(x_train - predictions_scaled[:, :, np.newaxis], 2))"""
+    
+    mse = mean_squared_error(y_train, predictions_scaled)
+    
     return mse
+def create_sequence(df, timesteps):
+    """
+    Create sequences of data for the model
+
+    """
+
+    # prende in ingresso un array di array 
+    # ogni array è una riga del csv 
+    # ogni riga è un array di 3 elementi
+    # mi restituisce un array 3-D
+    # l'array più interno è un array di 3 elementi ([x, y, z])
+    # ogni array intermedio è un blocco di timesteps ([[x1, y1, z1], [x2, y2, z2], ...])
+    # l'array esterno è l'insieme di tutti i blocchi ([[[x11, y11, z11], [x12, y12, z12], ...], [[x21, y21, z21], [x22, y22, z22], ...], ...])
+    sequences = []
+    targets = []
+    for i in range(len(df) - timesteps):
+        sequences.append(df[i:i + timesteps])
+        targets.append(df[i + timesteps])
+    return np.array(sequences), np.array(targets)

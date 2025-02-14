@@ -279,6 +279,5 @@ def ml_kmeans(df, sensor, num_iterations):
 
     return new_df_0, all_new_df_1, plot
 
-
 if __name__ == "__main__": 
     pass

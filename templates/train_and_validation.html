@@ -9,6 +9,14 @@
 </head>
 
 <body>
+    <nav class="navbar bg-body-tertiary">
+        <div class="container-fluid">
+          <a class="navbar-brand" href="{{ url_for('index')}}">
+            <img src="/static/images/page_image/home.png" alt="Logo" width="30" height="24" class="d-inline-block align-text-top">
+            Home
+          </a>
+        </div>
+    </nav>
     {% if show_eval %}
     <div class="container mt-5">
         <h1 class="custom-header-h1">Evaluation Results</h1>
@@ -252,7 +260,7 @@
                                                                 <div class="row mb-6">
                                                                     <div class="col-md-4"> 
                                                                         <label for="event" class="font-weight-bold fs-5">Event</label>
-                                                                        <select class="form-control" id="event_name" name="event_name" required onchange="setPercentageTo100()">
+                                                                        <select class="form-control" id="event_name" name="event_name" required onchange="if(this.value === 'lab') setPercentageTo100()">
                                                                             <option value="" selected> Select an event </option>
                                                                             {% for row in eventNames %}
                                                                             <option value="{{ row }}"> {{ row }} </option>

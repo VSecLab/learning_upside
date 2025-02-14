@@ -1,8 +1,8 @@
 import io
+import secrets
 import db_util as db
 import pandas as pd
 import mysql.connector
-# from global_ml import check
 import ml_workflow as mlw
 import upside_clustering as uc
 from flask_session import Session
@@ -30,6 +30,7 @@ def get_db_connection():
 
 @app.route('/')
 def index():
+    session.clear()
     return render_template('index.html')
 
 @app.route('/validate_logs', methods=['POST'])
