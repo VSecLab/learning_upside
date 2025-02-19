@@ -2,3 +2,4 @@ venv/
 ml_result/*
 static/images/*
 unione/
+models/checkpoint/*

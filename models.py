@@ -1,9 +1,12 @@
-from sklearn.preprocessing import MinMaxScaler
-from keras.models import Sequential
-from keras.layers import SimpleRNN, Dense, LSTM, RepeatVector, TimeDistributed
+import os
 import random 
 import numpy as np
 import tensorflow as tf
+from keras.models import Sequential
+from keras.callbacks import EarlyStopping
+from sklearn.preprocessing import MinMaxScaler
+from keras.layers import SimpleRNN, Dense, LSTM, RepeatVector, TimeDistributed
+
 def set_seed():
     random.seed(50)
     np.random.seed(50)
@@ -29,83 +32,87 @@ def create_sequence(df, timesteps):
         targets.append(df[i + timesteps])
     return np.array(sequences), np.array(targets)
 
-def create_model(df, epochs, batch_size, model_type):
-    #set_seed()
-    # Remove rows with missing values
-    df = df.dropna()
+def create_sequence_autoencoder(df, timesteps):
+    sequences = []
+    for i in range(len(df) - timesteps):
+        sequences.append(df[i:i + timesteps])
+    return np.array(sequences)
 
-    # Check if the DataFrame is empty after dropping NA
+def create_model(df, epochs, batch_size, model_type):
+
+    timesteps = 100
+    
+    df = df.dropna()
     if df.empty:
-        raise ValueError("The input DataFrame is empty after dropping missing values.")
+        raise ValueError("\nThe input DataFrame is empty after dropping missing values.")
 
     # Reshape to fit the model input (necessary for the shape [samples, timesteps, features])
     scaler = MinMaxScaler()
     df_scaled = scaler.fit_transform(df)
-
-    """print("create_model() - df_scaled:")
-    print(df_scaled)"""
-
-    # Reshape to fit the model input (necessary for the shape [samples, timesteps, features])
-    # df_scaled.shape[0] = number of samples
-    # df_scaled.shape[1] = number of timesteps 
-    # 1 = number of features
-
-    # numero blocchi 
-    # numero elemeneti per blocco 
-    # numero di features per blocco
-
-    timesteps = 100
-
-    x_train, y_train = create_sequence(df_scaled, timesteps)
-
     
-    print("create_model() - x_train:")
-    print(x_train)
+    # EarlyStopping callback
+    early_stopping = EarlyStopping(
+        monitor='loss', 
+        patience=3, 
+        mode = 'min',
+        restore_best_weights=True
+    )
 
-    print("create_model() - x_train.shape[0]:")
-    print(x_train.shape[0])
-
-    print("create_model() - x_train.shape[1]:")
-    print(x_train.shape[1])
-
-    print("create_model() - x_train.shape[2]:")
-    print(x_train.shape[2])
-
-    print("create_model() - y_train[-1] - x_train[-1]")
-    print(f"{y_train[0]} - {x_train[0]}")
-
-    #df_scaled = df_scaled.reshape((df_scaled.shape[0], df_scaled.shape[1], 1))
-    
-    # Model architecture configuration
     model = Sequential()
 
-    if model_type == 'RNN' or model_type == 'RNN3label':
-        model.add(SimpleRNN(units=32, input_shape=(df_scaled.shape[1], 3)))
-        model.add(Dense(units=df_scaled.shape[1]))  # Output per ogni passo temporale
-        print("------RNN model------")
-    elif model_type == 'LSTMauto' or model_type == 'LSTMlabel':
-        # model.add(LSTM(units=32, input_shape=(df_scaled.shape[1], 3)))
-        model.add(LSTM(units=32, input_shape=(x_train.shape[1], 3), return_sequences=True))
-        # model.add(RepeatVector(x_train.shape[1]))
-        model.add(LSTM(units=32, input_shape=(x_train.shape[1], 3), return_sequences=False))
-        # model.add(TimeDistributed(Dense(units=1)))
-        model.add(Dense(units=3))
+    if model_type == 'LSTMlabel':
+        x_train, y_train = create_sequence(df_scaled, timesteps)
+        # shape[0] -> numero di entry totali; shape[1] -> numero di timesteps in ogni squenza (100); shape[2] -> numero di features (3)
+        print(f"\ncreate_model() - x_train.shape[0]: {x_train.shape[0]} - x_train.shape[1]: {x_train.shape[1]} - x_train.shape[2]: {x_train.shape[2]}\n")
+
+        model.add(LSTM(units=50, input_shape=(x_train.shape[1], 3), return_sequences=True))
+        model.add(LSTM(units=50, input_shape=(x_train.shape[1], 3), return_sequences=False))
+        model.add(Dense(units=3)) 
         
-        print("------LSTMauto model------")
+        print("------LSTM model------\n")
+    elif model_type == 'LSTMauto': 
+        print(f"\ncreate_model() - df_scaled")
+        print(df_scaled)
+        x_train = create_sequence_autoencoder(df_scaled, timesteps)
+
+        print(f"\ncreate_model() - x_train")
+        print(x_train)
+
+        model.add(LSTM(units=50, input_shape=(x_train.shape[1], 3), return_sequences=False))
+        model.add(RepeatVector(x_train.shape[1]))
+        model.add(LSTM(units=50, input_shape=(x_train.shape[1], 3), return_sequences=True))
+        model.add(TimeDistributed(Dense(units=3))) 
+        
+        print("------LSTM model (autoencoder)------\n")
     else:
-        print(f"Model type '{model_type}' is not supported.")
-        raise ValueError("Invalid model_type. Supported types are 'RNN', 'RNN3label', 'LSTMauto', 'LSTMlabel'.")
+        print(f"\nModel type '{model_type}' is not supported.")
+        raise ValueError("Invalid model_type. Supported types are 'LSTMauto', 'LSTMlabel'.\n")
 
     model.compile(optimizer='adam', loss='mse')
     
-    # Model training
-    #history = model.fit(df_scaled, df_scaled, epochs=epochs, batch_size=batch_size, verbose=1)
-    history = model.fit(x_train, y_train, epochs=epochs, batch_size=batch_size, verbose=1)
+    if model_type == 'LSTMlabel':
+        # Model training
+        history = model.fit(
+            x_train, y_train, 
+            epochs=epochs, 
+            batch_size=batch_size, 
+            callbacks=[early_stopping],
+            verbose=1
+        )
+    elif model_type == 'LSTMauto': 
+        # Model training
+        history = model.fit(
+            x_train, x_train, 
+            epochs=epochs, 
+            batch_size=batch_size, 
+            callbacks=[early_stopping],
+            verbose=1
+        )
+
     training_loss = history.history['loss']
     training_loss = training_loss[-1]
     
-    print("create_model() - Training loss:")
+    print("\ncreate_model() - Training loss:")
     print(training_loss)
     
     return model, scaler, training_loss
-

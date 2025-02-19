@@ -8,10 +8,11 @@ import db_util as db
 import seaborn as sns
 import VisorData as vd
 import matplotlib.pyplot as plt
-from  sklearn.metrics import mean_squared_error
+
 
 from datetime import datetime
 from models import create_model
+from sklearn.metrics import mean_squared_error
 
 matplotlib.use('agg')
 
@@ -167,11 +168,16 @@ def evalutate_model_on_activity(right_test_logs, wrong_test_logs, chosen_model, 
     wrong_schema = {'log_id': [], 'mse': [], 'activity': 'Negative'}
     wrong_mses = pd.DataFrame(wrong_schema)
 
+    num_entry = 100
+
     print('Right logs evaluation')
     for log in right_logs:
         print(f'Log evaluation: {log}')
         df = right_logs[log]
-        mse = eval(chosen_model, scaler, df)
+        if len(df) < num_entry:
+            print(f'Log {log} has less than {num_entry} entries, skipping.')
+            continue
+        mse = eval(chosen_model, model_name, scaler, df)
         print(f'Mean Squared Error: {mse}')
         right_mses.loc[len(right_mses)] = [log, mse, 'Positive']
         
@@ -185,7 +191,10 @@ def evalutate_model_on_activity(right_test_logs, wrong_test_logs, chosen_model, 
     for log in wrong_logs:
         print(f'Log evaluation: {log}')
         df = wrong_logs[log]
-        mse = eval(chosen_model, scaler, df)
+        if len(df) < num_entry: # 100 is the timestep
+            print(f'Log {log} has less than {num_entry} entries, skipping.')
+            continue
+        mse = eval(chosen_model, model_name, scaler, df)
         print(f'Mean Squared Error: {mse}')
         wrong_mses.loc[len(wrong_mses)] = [log, mse, 'Negative']
     
@@ -509,7 +518,7 @@ def meta_eval_models(chosen_model, threshold, userid, scaler, device, features, 
 
     return mses, df_dict, path
 
-def eval(model, scaler, df): 
+def eval(model, model_name, scaler, df): 
     """
     Evaluate the model on the given dataframe.
 
@@ -527,31 +536,25 @@ def eval(model, scaler, df):
     float
         The mean squared error (MSE) for the given dataframe.
     """
+    timesteps = 100
     df = df.dropna()
 
     # data normalization
     df_scaled = scaler.transform(df)
-    timesteps = 100
-    # reshape the data for the model input 
-    # df_scaled = df_scaled.reshape((df_scaled.shape[0], df_scaled.shape[1], 1))
-    x_train, y_train = create_sequence(df_scaled, timesteps)
-    #predictions_scaled = model.predict(df_scaled)
-    #test_x = x_train[0].reshape((1, x_train.shape[1], x_train.shape[2]))
-    predictions_scaled = model.predict(x_train)
-
-    """print("eval() - predictions_scaled:")
-    print(predictions_scaled)
-    print("eval() - y_train[0]", y_train[0])"""
-
-    """
-    # Check if shapes match before computing MSE
-    if df_scaled.shape == predictions_scaled.shape:
-        # compute the mean squared error 
-        mse = np.mean(np.power(x_train - predictions_scaled, 2))
-    else:
-        mse = np.mean(np.power(x_train - predictions_scaled[:, :, np.newaxis], 2))"""
     
-    mse = mean_squared_error(y_train, predictions_scaled)
+    if model_name == 'LSTMlabel':
+        x_test, y_train = create_sequence(df_scaled, timesteps)
+        predictions_scaled = model.predict(x_test)
+        mse = mean_squared_error(y_train, predictions_scaled)
+
+    elif model_name == 'LSTMauto':
+        x_test = create_sequence_autoencoder(df_scaled, timesteps)
+        predictions_scaled = model.predict(x_test)
+
+        x_test_flattened = x_test.reshape(x_test.shape[0], -1)
+        predictions_flattened = predictions_scaled.reshape(predictions_scaled.shape[0], -1)
+
+        mse = mean_squared_error(x_test_flattened, predictions_flattened)
     
     return mse
 def create_sequence(df, timesteps):
@@ -573,3 +576,9 @@ def create_sequence(df, timesteps):
         sequences.append(df[i:i + timesteps])
         targets.append(df[i + timesteps])
     return np.array(sequences), np.array(targets)
+
+def create_sequence_autoencoder(df, timesteps):
+    sequences = []
+    for i in range(len(df) - timesteps):
+        sequences.append(df[i:i + timesteps])
+    return np.array(sequences)
