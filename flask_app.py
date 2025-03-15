@@ -114,7 +114,7 @@ def process_logs():
             sub_lablogs = {sensor: lab_logs.get(sensor.lower(), [])}
         else: 
             sub_lablogs = lab_logs
-        chosen_model, scaler, training_loss, test_log, train_log = mlw.model_train_lab_activity(sub_lablogs, activity_name, epochs, batch_size, model)
+        chosen_model, scaler, training_loss, test_log, train_log = mlw.model_train_lab_activity(sub_lablogs, activity_name, epochs, batch_size, percentage, model)
         test_log = {k: sub_logs[k] for k in list(sub_logs)}
         test_log_keys = list(test_log.keys())
         print("\nprocess_logs() - test_log") 

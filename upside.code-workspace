@@ -1,0 +1,26 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../database"
+		},
+		{
+			"path": "../../firebase_UPSIDE"
+		},
+		{
+			"path": "../../../../University/Magistrale/2_anno/Sistemi_Distribuiti/Esercizi_MPI"
+		},
+		{
+			"path": "../../../../University/Magistrale/2_anno/Sistemi_Distribuiti/Prove esame"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.pl": "prolog",
+			"mpi.h": "c",
+			"stdio.h": "c"
+		}
+	}
+}

@@ -6,6 +6,7 @@ from keras.models import Sequential
 from keras.callbacks import EarlyStopping
 from sklearn.preprocessing import MinMaxScaler
 from keras.layers import SimpleRNN, Dense, LSTM, RepeatVector, TimeDistributed
+from sklearn.metrics import mean_squared_error
 
 def set_seed():
     random.seed(50)
@@ -63,20 +64,15 @@ def create_model(df, epochs, batch_size, model_type):
     if model_type == 'LSTMlabel':
         x_train, y_train = create_sequence(df_scaled, timesteps)
         # shape[0] -> numero di entry totali; shape[1] -> numero di timesteps in ogni squenza (100); shape[2] -> numero di features (3)
-        print(f"\ncreate_model() - x_train.shape[0]: {x_train.shape[0]} - x_train.shape[1]: {x_train.shape[1]} - x_train.shape[2]: {x_train.shape[2]}\n")
-
+        # print(f"\ncreate_model() - x_train.shape[0]: {x_train.shape[0]} - x_train.shape[1]: {x_train.shape[1]} - x_train.shape[2]: {x_train.shape[2]}\n")
+        
         model.add(LSTM(units=50, input_shape=(x_train.shape[1], 3), return_sequences=True))
         model.add(LSTM(units=50, input_shape=(x_train.shape[1], 3), return_sequences=False))
         model.add(Dense(units=3)) 
         
         print("------LSTM model------\n")
     elif model_type == 'LSTMauto': 
-        print(f"\ncreate_model() - df_scaled")
-        print(df_scaled)
         x_train = create_sequence_autoencoder(df_scaled, timesteps)
-
-        print(f"\ncreate_model() - x_train")
-        print(x_train)
 
         model.add(LSTM(units=50, input_shape=(x_train.shape[1], 3), return_sequences=False))
         model.add(RepeatVector(x_train.shape[1]))
@@ -99,6 +95,31 @@ def create_model(df, epochs, batch_size, model_type):
             callbacks=[early_stopping],
             verbose=1
         )
+
+        # calcolo della mse e std sui dati di train 
+        k = 3 # iperparametro: mi dice quanto sono conservativo nel definire il threshold
+
+        y_pred = model.predict(x_train)
+        mse = mean_squared_error(y_train, y_pred)
+        std = np.std(mse)
+        mse_tmp = (y_train - y_pred)**2 
+        std_tmp = np.std(mse_tmp)
+        t = mse_tmp + k*std_tmp
+    
+        print("\ncreate_model() - Training MSE:")
+        print(mse_tmp)
+        print("\ncreate_model() - Training STD:")
+        print(std_tmp)
+        print("\ncreate_model() - Threshold tmp:")
+        print(t)
+        print("\ncreate_model() - Training MSE:")
+        print(mse)
+        print("\ncreate_model() - Training STD:")
+        print(std)
+        threshold_tmp = mse + k*std 
+        print("\ncreate_model() - Threshold:")
+        print(threshold_tmp)
+
     elif model_type == 'LSTMauto': 
         # Model training
         history = model.fit(

@@ -177,7 +177,7 @@ def evalutate_model_on_activity(right_test_logs, wrong_test_logs, chosen_model, 
         if len(df) < num_entry:
             print(f'Log {log} has less than {num_entry} entries, skipping.')
             continue
-        mse = eval(chosen_model, model_name, scaler, df)
+        mse = eval(chosen_model, model_name, scaler, df, log)
         print(f'Mean Squared Error: {mse}')
         right_mses.loc[len(right_mses)] = [log, mse, 'Positive']
         
@@ -194,7 +194,7 @@ def evalutate_model_on_activity(right_test_logs, wrong_test_logs, chosen_model, 
         if len(df) < num_entry: # 100 is the timestep
             print(f'Log {log} has less than {num_entry} entries, skipping.')
             continue
-        mse = eval(chosen_model, model_name, scaler, df)
+        mse = eval(chosen_model, model_name, scaler, df, log)
         print(f'Mean Squared Error: {mse}')
         wrong_mses.loc[len(wrong_mses)] = [log, mse, 'Negative']
     
@@ -260,7 +260,7 @@ def eval_models(sensor, threshold, right_test_logs, wrong_test_logs, chosen_mode
     conf_matrix = confusion_matrix(df, model_name, sensor, basename, event_name)
     return eval_results, conf_matrix
 
-def model_train_lab_activity(lab_logs, activity_name, epochs, batch_size, model): 
+def model_train_lab_activity(lab_logs, activity_name, epochs, batch_size, percentage, model): 
     """
     Train a machine learning model on laboratory data.
 
@@ -291,7 +291,7 @@ def model_train_lab_activity(lab_logs, activity_name, epochs, batch_size, model)
         List of log identifiers used for training.
     """
 
-    chosen_model, scaler, training_loss, test_log_keys, train_log_keys = model_train_activity(lab_logs, epochs, batch_size, 100, model)
+    chosen_model, scaler, training_loss, test_log_keys, train_log_keys = model_train_activity(lab_logs, epochs, batch_size, percentage, model)
 
     return chosen_model, scaler, training_loss, test_log_keys, train_log_keys
 
@@ -518,7 +518,7 @@ def meta_eval_models(chosen_model, threshold, userid, scaler, device, features, 
 
     return mses, df_dict, path
 
-def eval(model, model_name, scaler, df): 
+def eval(model, model_name, scaler, df, log): 
     """
     Evaluate the model on the given dataframe.
 
@@ -545,6 +545,15 @@ def eval(model, model_name, scaler, df):
     if model_name == 'LSTMlabel':
         x_test, y_train = create_sequence(df_scaled, timesteps)
         predictions_scaled = model.predict(x_test)
+
+        # Save y_train and predictions_scaled to a CSV file
+        results_df = pd.DataFrame({
+            'y_train': y_train.flatten(),
+            'predictions_scaled': predictions_scaled.flatten()
+        })
+        os.makedirs('ml_result/predictions_good_log', exist_ok=True)
+        results_df.to_csv(f'ml_result/predictions_good_log/{log}_y_train_predictions_scaled_LSTM.csv', index=False)
+
         mse = mean_squared_error(y_train, predictions_scaled)
 
     elif model_name == 'LSTMauto':
@@ -553,6 +562,14 @@ def eval(model, model_name, scaler, df):
 
         x_test_flattened = x_test.reshape(x_test.shape[0], -1)
         predictions_flattened = predictions_scaled.reshape(predictions_scaled.shape[0], -1)
+
+        # Save x_test and predictions_scaled to a CSV file
+        results_df = pd.DataFrame({
+            'x_test': x_test_flattened.flatten(),
+            'predictions_scaled': predictions_flattened.flatten()
+        })
+        os.makedirs('ml_result/predictions', exist_ok=True)
+        results_df.to_csv(f'ml_result/predictions/{log}_x_test_predictions_scaled_LSTMauto.csv', index=False)
 
         mse = mean_squared_error(x_test_flattened, predictions_flattened)
     

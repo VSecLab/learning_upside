@@ -58,6 +58,7 @@ def get_df_from_logID(logIDs):
     mydb, mycursor = db_connect()
 
     logs_dict = {}
+    
     for sensor, id_logs in logIDs.items():
         for id_log in id_logs:
             # sql = f"select {parameters[0]}, {parameters[1]}, {parameters[2]} from {sensor.lower()} where ID_log = \"{id_log}\""
@@ -76,6 +77,21 @@ def get_df_from_logID(logIDs):
             except mysql.connector.Error as err:
                 print(f"Error - logs: {err}")
             print(f"get_df_from_logID - sensor {sensor} - log {id_log}: done")
+    """
+    for sensor, id_logs in logIDs.items():
+        id_logs_str = ', '.join(f'"{id_log}"' for id_log in id_logs)
+        sql = f"SELECT ID_log, timestamp, parameter, value FROM measurement WHERE ID_log IN ({id_logs_str}) ORDER BY ID_log, timestamp;"
+
+        try:
+            mycursor.execute(sql)
+            data = mycursor.fetchall()
+            df = pd.DataFrame(data, columns=['ID_log', 'timestamp', 'parameter', 'value'])
+            for id_log, group in df.groupby('ID_log'):
+                df_pivot = group.pivot_table(index='timestamp', columns='parameter', values='value')
+                logs_dict[id_log] = df_pivot
+            mydb.commit()
+        except mysql.connector.Error as err:
+            print(f"Error - logs: {err}")"""
     db_disconnect(mydb, mycursor)
 
     return logs_dict

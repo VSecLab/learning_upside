@@ -31,7 +31,6 @@ function updateFeatureOptions() {
 function setPercentageTo100() {
     var percentageInput = document.getElementById('percentage');
     percentageInput.value = 100;
-    percentageInput.readOnly = true;
 }
 
 
